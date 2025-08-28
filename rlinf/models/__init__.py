@@ -97,7 +97,7 @@ def get_model_config_and_processor(cfg: DictConfig):
         from lerobot.common.policies.pi0.configuration_pi0 import PI0Config
         from lerobot.configs.policies import PreTrainedConfig
         AutoConfig.register("pi0", PI0Config)
-        model_config: PI0Config = PreTrainedConfig.from_pretrained(cfg.tokenizer.tokenizer_model)
+        model_config: PI0Config = PI0Config.from_pretrained(cfg.tokenizer.tokenizer_model)
         # Pi0 doesn't use traditional tokenizer/image processor
         # It handles preprocessing internally
         input_processor = None
@@ -185,7 +185,8 @@ def get_model(model_path, cfg: DictConfig, override_config_kwargs=None):
         from .embodiment.pi0_action_model import Pi0ForRLActionPrediction
         AutoConfig.register("pi0", PI0Config)
         # Load policy configuration from pretrained path
-        actor_model_config: PI0Config = PreTrainedConfig.from_pretrained(model_path)
+        # actor_model_config: PI0Config = PreTrainedConfig.from_pretrained(model_path)
+        actor_model_config: PI0Config = PI0Config.from_pretrained(model_path)
         actor_model_config.pretrained_path = model_path
         override_config_kwargs = cfg
         if override_config_kwargs is not None:

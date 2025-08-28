@@ -32,6 +32,8 @@ from rlinf.utils.utils import clear_memory
 
 
 def should_wrap(module):
+    return False
+    # TODO cannot import name 'PaliGemmaForConditionalGeneration' from 'transformers' in transformers 4.40.1
     from transformers import PaliGemmaForConditionalGeneration
     if isinstance(module, PaliGemmaForConditionalGeneration):
         return True
@@ -133,14 +135,14 @@ class FSDPModelManager:
                 else:
                     params_actor.append(param)
 
-        if len(params_actor) > 0:
+        if len(params_critic) > 0:
             self.optimizer = optim.AdamW([
                 {'params': params_actor, 'lr': self._cfg.optim.lr, 'betas': betas},
-                # {'params': params_critic, 'lr': self._cfg.optim.value_lr, 'betas': betas},
+                {'params': params_critic, 'lr': self._cfg.optim.value_lr, 'betas': betas},
             ])
         else:
             self.optimizer = optim.AdamW([
-                {'params': params_critic, 'lr': self._cfg.optim.value_lr, 'betas': betas},
+                {'params': params_actor, 'lr': self._cfg.optim.lr, 'betas': betas},
             ])
 
     def get_model_state_dict(self):

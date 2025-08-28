@@ -133,6 +133,7 @@ class MultiStepRolloutWorker(Worker):
         self._obs_queue_name = cfg.env.channel.queue_name
         self._action_queue_name = cfg.rollout.channel.queue_name
         self._replay_buffer_name = cfg.actor.channel.queue_name
+        self._num_images_in_input = cfg.actor.model.num_images_in_input
         # stage_num: default to 2, use for pipeline rollout process
         self.stage_num = cfg.rollout.pipeline_stage_num
 
@@ -273,6 +274,7 @@ class MultiStepRolloutWorker(Worker):
                         max_length=self.hf_model.max_prompt_length,
                         processor=self.input_processor,
                         precision=self.precision,
+                        num_images_in_input=self._num_images_in_input
                     )
                     result = self.predict(processed_obs)
                     _final_values = result["chunk_values"]
@@ -309,6 +311,7 @@ class MultiStepRolloutWorker(Worker):
                         max_length=self.hf_model.max_prompt_length,
                         processor=self.input_processor,
                         precision=self.precision,
+                        num_images_in_input=self._num_images_in_input
                     )
                     result = self.predict(processed_obs)
                 # Extract actions for sending
@@ -338,11 +341,11 @@ class MultiStepRolloutWorker(Worker):
                     max_length=self.hf_model.max_prompt_length,
                     processor=self.input_processor,
                     precision=self.precision,
+                    num_images_in_input=self._num_images_in_input
                 )
-                _, _, _, final_chunk_values = self.predict(processed_obs)
-                self.buffer_list[i]["prev_values"].append(
-                    final_chunk_values.cpu().contiguous()
-                )
+                result = self.predict(processed_obs)
+                final_chunk_values = result["prev_values"]
+                self.buffer_list[i]["prev_values"].append(final_chunk_values.cpu().contiguous())
 
                 if (
                     not self.cfg.env.train.auto_reset
@@ -377,6 +380,7 @@ class MultiStepRolloutWorker(Worker):
                     max_length=self.hf_model.max_prompt_length,
                     processor=self.input_processor,
                     precision=self.precision,
+                    num_images_in_input=self._num_images_in_input
                 )
                 chunk_actions, _, _, _ = self.predict(processed_obs, mode="eval")
                 await self.send_chunk_actions(chunk_actions)

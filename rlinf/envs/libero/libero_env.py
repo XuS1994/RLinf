@@ -231,6 +231,7 @@ class LiberoEnv(gym.Env):
         return infos
 
     def _extract_image_and_state(self, obs):
+        assert self.cfg.num_images_in_input > 1, "num_images_in_input must be bigger than 1"
         if self.cfg.num_images_in_input > 1:
             return {
                 "full_image": get_libero_image(obs),

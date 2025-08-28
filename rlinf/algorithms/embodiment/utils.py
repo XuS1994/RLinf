@@ -163,7 +163,7 @@ def calculate_advantages_and_returns(
     # TODO: HERE FOR SIMPLE TEST
     # TODO: ADV CALCULATION BUG & DONE REWARD MATCHING
     if adv_type == "grpo":
-        from infini_rl.algorithms.embodiment.grpo_functions import (
+        from rlinf.algorithms.embodiment.grpo_functions import (
             compute_advantages_with_loss_mask,
         )
         advantages = compute_advantages_with_loss_mask(
@@ -183,7 +183,7 @@ def calculate_advantages_and_returns(
         # return advs, None
 
     elif adv_type == "ppo":
-        from infini_rl.algorithms.embodiment.ppo_functions import (
+        from rlinf.algorithms.embodiment.ppo_functions import (
             compute_advantages_and_returns,
         )
         advantages, returns = compute_advantages_and_returns(
@@ -215,40 +215,43 @@ def actor_loss_fn(
     value_clip: float,
     huber_delta: float,
     entropy_bonus: float,
-    loss_mask: torch.Tensor,
-    loss_mask_sum: torch.Tensor
+    loss_mask: Optional[torch.Tensor] = None,
+    loss_mask_sum: Optional[torch.Tensor] = None,
 ) -> Tuple[torch.Tensor, Dict]:
+    bsz = logprobs.shape[0]
+    # logprobs.shape: [bsz, token-len]
+    # advantage.shape: [bsz, chunk-step]
+    if logprob_type == "token_level":
+        logprobs = logprobs.reshape(bsz, -1, single_action_dim)
+        old_logprobs = old_logprobs.reshape(bsz, -1, single_action_dim)
+        advantages = advantages.unsqueeze(-1)
+        if loss_mask is not None:
+            loss_mask = loss_mask.unsqueeze(-1)
+            loss_mask_sum *= single_action_dim
+            loss_mask_sum = loss_mask_sum.unsqueeze(-1)
+
+    elif logprob_type == "action_level":
+        logprobs = logprobs.reshape(bsz, -1, single_action_dim).sum(dim=-1)
+        old_logprobs = old_logprobs.reshape(bsz, -1, single_action_dim).sum(dim=-1)
+    elif logprob_type == "chunk_level":
+        logprobs = logprobs.sum(dim=-1)
+        old_logprobs = old_logprobs.sum(dim=-1)
+        advantages = advantages.sum(dim=-1)
+
     if loss_type == "grpo":
-        from infini_rl.algorithms.embodiment.grpo_functions import (
-            actor_loss_fn_with_loss_mask,
-        )
-        return actor_loss_fn_with_loss_mask(
+        from rlinf.algorithms.embodiment.grpo_functions import actor_loss_fn
+
+        return actor_loss_fn(
             log_probs=logprobs,
             old_log_prob=old_logprobs,
             advantages=advantages,
             clip_ratio_high=clip_ratio_high,
             clip_ratio_low=clip_ratio_low,
             loss_mask=loss_mask,
-            loss_mask_sum=loss_mask_sum
+            loss_mask_sum=loss_mask_sum,
         )
     elif loss_type == "ppo":
-        from infini_rl.algorithms.embodiment.ppo_functions import actor_critic_loss_fn
-        # TODO: @zanghongzhi @guozhen decoupled critic loss calculation
-        bsz = logprobs.shape[0]
-
-        # logprobs.shape: [bsz, token-len]
-        # advantage.shape: [bsz, chunk-step]
-        if logprob_type == "token_level":
-            logprobs = logprobs.reshape(bsz, -1, single_action_dim)
-            old_logprobs = old_logprobs.reshape(bsz, -1, single_action_dim)
-            advantages = advantages.unsqueeze(-1)
-        elif logprob_type == "action_level":
-            logprobs = logprobs.reshape(bsz, -1, single_action_dim).sum(dim=-1)
-            old_logprobs = old_logprobs.reshape(bsz, -1, single_action_dim).sum(dim=-1)
-        elif logprob_type == "chunk_level":
-            logprobs = logprobs.sum(dim=-1)
-            old_logprobs = old_logprobs.sum(dim=-1)
-            advantages = advantages.sum(dim=-1)
+        from rlinf.algorithms.embodiment.ppo_functions import actor_critic_loss_fn
 
         if entropy_type == "token_level":
             pass
@@ -269,5 +272,5 @@ def actor_loss_fn(
             clip_ratio_low=clip_ratio_low,
             value_clip=value_clip,
             huber_delta=huber_delta,
-            entropy_bonus=entropy_bonus
+            entropy_bonus=entropy_bonus,
         )

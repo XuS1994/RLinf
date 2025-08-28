@@ -15,3 +15,5 @@ logs/*
 *.so
 .venv
 uv.lock
+lerobot
+data
