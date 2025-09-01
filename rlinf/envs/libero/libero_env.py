@@ -55,7 +55,6 @@ class LiberoEnv(gym.Env):
         self._generator = np.random.default_rng(seed=self.seed)
 
         self.task_suite: Benchmark = get_benchmark(cfg.task_suite_name)()
-
         self._compute_total_num_group_envs()
         self.update_reset_state_ids()
         self._init_task_and_trial_ids()
@@ -126,7 +125,8 @@ class LiberoEnv(gym.Env):
 
     def update_reset_state_ids(self):
         if self.cfg.only_eval:
-            reset_state_ids = self._get_ordered_reset_state_ids(8)
+            # TODO : zhihao : group_size * num_group_envs / env_process_num
+            reset_state_ids = self._get_ordered_reset_state_ids(50) 
             self.reset_state_ids = reset_state_ids.clip(0,499)
         else:
             reset_state_ids = self._get_random_reset_state_ids(self.num_group)
@@ -138,8 +138,11 @@ class LiberoEnv(gym.Env):
         )
 
     def _get_random_reset_state_ids(self, num_reset_states):
+        # reset_state_ids = self._generator.integers(
+        #     low=0, high=self.total_num_group_envs, size=(num_reset_states,)
+        # )
         reset_state_ids = self._generator.integers(
-            low=0, high=self.total_num_group_envs, size=(num_reset_states,)
+            low=50 * self.rank, high= 50 * (self.rank + 1), size=(num_reset_states, )
         )
         return reset_state_ids
 
@@ -283,7 +286,8 @@ class LiberoEnv(gym.Env):
         if reconfig_env_idx:
             env_fn_params = self.get_env_fn_params(reconfig_env_idx)
             self.env.reconfigure_env_fns(env_fn_params, reconfig_env_idx)
-
+        self.env.seed(self.seed)
+        self.env.reset(id=env_idx)
         init_state = self._get_reset_states(env_idx=env_idx)
         self.env.set_init_state(init_state=init_state, id=env_idx)
 
@@ -302,9 +306,10 @@ class LiberoEnv(gym.Env):
 
         self._reconfigure(reset_state_ids, env_idx)
 
-        raw_obs = self.env.reset(id=env_idx, **options)
-        for _ in range(10):
+        # raw_obs = self.env.reset(id=env_idx, **options)
+        for _ in range(15):
             zero_actions = np.zeros((self.num_envs, 7))
+            zero_actions[:,-1] = -1
             raw_obs, _reward, terminations, info_lists = self.env.step(zero_actions)
 
         obs = self._wrap_obs(raw_obs)
@@ -337,7 +342,6 @@ class LiberoEnv(gym.Env):
         raw_obs, _reward, terminations, info_lists = self.env.step(actions)
         infos = list_of_dict_to_dict_of_list(info_lists)
         truncations = self.elapsed_steps >= self.cfg.max_episode_steps
-
         obs = self._wrap_obs(raw_obs)
 
         step_reward = self._calc_step_reward(terminations)
@@ -411,6 +415,8 @@ class LiberoEnv(gym.Env):
         else:
             chunk_terminations = raw_chunk_terminations.clone()
             chunk_truncations = raw_chunk_truncations.clone()
+        # TODO: zhihao : add success_once to infos["episode"] for each rank
+        infos["episode"][f"per_task_eval/task_{self.rank}"] = infos["episode"]["success_once"]
         return (
             extracted_obs,
             chunk_rewards,

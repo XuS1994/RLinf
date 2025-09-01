@@ -274,28 +274,35 @@ def actor_loss_fn(
     pg_losses2 = -advantages * torch.clamp(
         ratio, 1.0 - clip_ratio_low, 1.0 + clip_ratio_high
     )
-
-    if loss_mask is not None:
-        # Take the maximum of clipped and unclipped losses
-        pg_loss = (
-            masked_sum(torch.max(pg_losses, pg_losses2) / loss_mask_sum, loss_mask)
-            / bsz
-        )  # float
-        pg_clipfrac = (
-            masked_sum(
-                torch.gt(pg_losses2, pg_losses).float() / loss_mask_sum, loss_mask
-            )
-            / bsz
-        )  # float
-    else:
-        # Take the maximum of clipped and unclipped losses
-        pg_loss = torch.max(pg_losses, pg_losses2).mean()  # float
-        pg_clipfrac = torch.gt(pg_losses2, pg_losses).float().mean()  # float
+    pg_loss = torch.mean(torch.max(pg_losses, pg_losses2)[loss_mask])
+    pg_clipfrac = torch.mean(torch.gt(pg_losses2, pg_losses).float()[loss_mask])
+    approx_kl = torch.mean(((ratio - 1) - logratio)[loss_mask])
+    # if loss_mask is not None:
+    #     # Take the maximum of clipped and unclipped losses
+    #     pg_loss = (
+    #         masked_sum(torch.max(pg_losses, pg_losses2) / loss_mask_sum, loss_mask)
+    #         / bsz
+    #     )  # float
+    #     pg_clipfrac = (
+    #         masked_sum(
+    #             torch.gt(pg_losses2, pg_losses).float() / loss_mask_sum, loss_mask
+    #         )
+    #         / bsz
+    #     )  # float
+    # else:
+    #     # Take the maximum of clipped and unclipped losses
+    #     pg_loss = torch.max(pg_losses, pg_losses2).mean()  # float
+    #     pg_clipfrac = torch.gt(pg_losses2, pg_losses).float().mean()  # float
 
     # Compile metrics for logging
     metrics_data = {
         "actor/raw_loss": pg_loss.detach().item(),
         "actor/policy_loss": pg_loss.detach().item(),
         "actor/policy_clipfrac": pg_clipfrac.detach().item(),
+        "actor/approx_kl": approx_kl.detach().item(),
+        "actor/ratio_mean": ratio.mean().detach().item(),
+        "actor/ratio_max": ratio.max().detach().item(),
+        "actor/ratio_min": ratio.min().detach().item(),
+        "valid_sample_num": loss_mask.sum().detach().item(),
     }
     return pg_loss, metrics_data

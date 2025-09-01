@@ -126,7 +126,7 @@ def prepare_observations_for_vla(
             for t in raw_obs["task_descriptions"]
         ]
 
-    print(f"raw_obs keys: {raw_obs.keys()}")
+    # print(f"raw_obs keys: {raw_obs.keys()}")
 
     if simulator_type == "libero":
         if num_images_in_input > 1:

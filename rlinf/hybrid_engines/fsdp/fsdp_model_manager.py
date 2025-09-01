@@ -32,7 +32,8 @@ from rlinf.utils.utils import clear_memory
 
 
 def should_wrap(module):
-    return False
+    # return False
+    # TODO: zhihao: add PaliGemmaForConditionalGeneration to the should_wrap function
     # TODO cannot import name 'PaliGemmaForConditionalGeneration' from 'transformers' in transformers 4.40.1
     from transformers import PaliGemmaForConditionalGeneration
     if isinstance(module, PaliGemmaForConditionalGeneration):
@@ -99,22 +100,24 @@ class FSDPModelManager:
             buffer_dtype=self.torch_dtype,
         )
 
-        if self._cfg.model.sharding_strategy == "full_shard":
-            sharding_strategy = ShardingStrategy.FULL_SHARD
-            auto_wrap_policy = get_fsdp_wrap_policy(
-                module=module, config=None, is_lora=self._cfg.model.is_lora
-            )
-        elif self._cfg.model.sharding_strategy == "shard_grad_op":
-            sharding_strategy = ShardingStrategy.SHARD_GRAD_OP
-            auto_wrap_policy = None
-        else:
-            sharding_strategy = ShardingStrategy.NO_SHARD
-            auto_wrap_policy = None
+        # if self._cfg.model.sharding_strategy == "full_shard":
+        #     sharding_strategy = ShardingStrategy.FULL_SHARD
+        #     auto_wrap_policy = get_fsdp_wrap_policy(
+        #         module=module, config=None, is_lora=self._cfg.model.is_lora
+        #     )
+        # elif self._cfg.model.sharding_strategy == "shard_grad_op":
+        #     sharding_strategy = ShardingStrategy.SHARD_GRAD_OP
+        #     auto_wrap_policy = None
+        # else:
+        #     sharding_strategy = ShardingStrategy.NO_SHARD
+        #     auto_wrap_policy = None
 
+        # TODO: zhihao: change to no_shard
+        sharding_strategy = ShardingStrategy.NO_SHARD
         auto_wrap_policy = functools.partial(lambda_auto_wrap_policy, lambda_fn=should_wrap)
 
         betas = (self._cfg.optim.adam_beta1, self._cfg.optim.adam_beta2)
-
+        
         self.model = FSDP(
             module,
             param_init_fn=init_fn,

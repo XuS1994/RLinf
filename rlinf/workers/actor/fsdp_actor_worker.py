@@ -20,6 +20,7 @@ import torch
 from omegaconf import DictConfig
 from torch.distributed.device_mesh import init_device_mesh
 from tqdm import tqdm
+import torch.distributed.fsdp as FSDP
 
 from rlinf.algorithms.embodiment.utils import (
     actor_loss_fn,
@@ -190,6 +191,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
             num_group_envs=num_group_envs_for_train,
             group_size=self.cfg.algorithm.get("group_size", 8),
             num_action_chunks=self.cfg.actor.model.get("num_action_chunks", 1),
+            rollout_epoch=self.cfg.algorithm.rollout_epoch,
             reward_type=self.cfg.algorithm.reward_type,
             loss_mask=self.rollout_batch.get("loss_mask", None),
         )
@@ -209,7 +211,6 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
             * self.rollout_batch["prev_logprobs"].shape[1]
         )
         shuffle_id = torch.randperm(rollout_size)
-
         for key, value in self.rollout_batch.items():
             self.log_on_first_rank(f"run training, {key}: {value.shape if value is not None else None}")
 
@@ -274,6 +275,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
                 data = self.model.preprocess_for_train(data)
                 if self.cfg.actor.model.model_name == "pi0":
                     data_size = data["prev_logprobs"].shape[0]
+                    # NOTE : random select one step to optimize
                     denoise_inds = torch.randint(0, self.cfg.actor.model.num_steps, (data_size,))
                     data["denoise_inds"] = denoise_inds # TODO: add mix mode
                     data["prev_logprobs"] = data["prev_logprobs"][torch.arange(data_size), denoise_inds]
@@ -343,7 +345,26 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
                 append_to_dict(metrics, metrics_data)
 
             torch.cuda.empty_cache()
+            breakpoint()
 
+            # ----------------------TODO: zhihao: add grad norm check------------------------------
+            # from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+            # import torch, math
+            # # 1) FSDP 版本（全局、一致）
+            # fsdp_total_norm = FSDP.clip_grad_norm_(self.model, max_norm=float('inf'))  # 不剪，只取返回的范数
+
+            # # 2) 本地 PyTorch 版本（NO_SHARD 下应与 1) 一致；SHARD 下它只算本地 shard，会变小）
+            # local_total_norm = torch.nn.utils.clip_grad_norm_(
+            #     (p for p in self.model.parameters() if p.grad is not None),  # 只要有梯度的
+            #     max_norm=float('inf')
+            # )
+
+            # if torch.distributed.get_rank() == 0:
+            #     diff = abs(fsdp_total_norm.item() - local_total_norm.item())
+            #     rel = diff / (fsdp_total_norm.item() + 1e-12)
+            #     print(f"[GradNorm] FSDP={fsdp_total_norm.item():.6e} | local={local_total_norm.item():.6e} | "
+            #         f"abs_diff={diff:.3e} rel_diff={rel:.3e}")
+            # --------------------------------------------------------------
             grad_norm = self.model.clip_grad_norm_(
                 max_norm=self.cfg.actor.optim.clip_grad
             )
@@ -357,12 +378,14 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
             if self.cfg.algorithm.adv_type == "ppo":
                 data["critic/lr"] = self.optimizer.param_groups[1]["lr"]
             append_to_dict(metrics, data)
-
         mean_metric_dict = {key: np.mean(value) for key, value in metrics.items()}
+        loss_task = mean_metric_dict["actor/raw_loss"]
+        valid_sample_num = mean_metric_dict.pop("valid_sample_num")
         mean_metric_dict = all_reduce_dict(
             mean_metric_dict, op=torch.distributed.ReduceOp.AVG
         )
-
+        mean_metric_dict[f"per_task_loss/task_{self._rank}"] = loss_task
+        mean_metric_dict[f"per_task_valid_sample/task_{self._rank}"] = valid_sample_num
         self.optimizer.zero_grad()
         torch.cuda.synchronize()
         torch.distributed.barrier()
