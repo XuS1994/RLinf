@@ -244,6 +244,7 @@ def actor_loss_fn(
     clip_ratio_low: float,
     loss_mask: Optional[torch.Tensor] = None,
     loss_mask_sum: Optional[torch.Tensor] = None,
+    use_norm_adv: bool = False,
 ) -> Tuple[torch.Tensor, Dict]:
     """
     Compute actor loss for Group Relative Policy Optimization (GRPO).
@@ -268,7 +269,18 @@ def actor_loss_fn(
     bsz = log_probs.shape[0]
     logratio = log_probs - old_log_prob
     ratio = torch.exp(logratio)
-
+    breakpoint()
+    if use_norm_adv:
+        if loss_mask is not None:
+            adv_mean = advantages[loss_mask].mean()
+            adv_std = advantages[loss_mask].std()  
+        else:
+            adv_mean = advantages.mean()
+            adv_std = advantages.std()  
+        if adv_std < 1e-8:
+            advantages = torch.zeros_like(advantages)
+        else:
+            advantages = (advantages - adv_mean) / (adv_std + 1e-8)
     # Compute clipped and unclipped policy gradient losses
     pg_losses = -advantages * ratio
     pg_losses2 = -advantages * torch.clamp(

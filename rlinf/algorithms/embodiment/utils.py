@@ -235,6 +235,7 @@ def actor_loss_fn(
     entropy_bonus: float,
     loss_mask: Optional[torch.Tensor] = None,
     loss_mask_sum: Optional[torch.Tensor] = None,
+    use_norm_adv: bool = False,
 ) -> Tuple[torch.Tensor, Dict]:
     bsz = logprobs.shape[0]
     # logprobs.shape: [bsz, token-len]
@@ -276,6 +277,7 @@ def actor_loss_fn(
             clip_ratio_low=clip_ratio_low,
             loss_mask=loss_mask,
             loss_mask_sum=loss_mask_sum,
+            use_norm_adv=use_norm_adv,
         )
     elif loss_type == "ppo":
         from rlinf.algorithms.embodiment.ppo_functions import actor_critic_loss_fn

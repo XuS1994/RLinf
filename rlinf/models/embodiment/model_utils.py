@@ -180,18 +180,19 @@ def prepare_observations_for_vla(
             max_length=max_length,
         )
     elif model_name == "pi0":
+        # TODO: zhihao: change to float32
         to_process_input = {
-            "observation.images.image": main_image_tensor/ 255,
-            "observation.images.wrist_image": wrist_image_tensor/ 255,
-            "observation.state": proprio_states['state'],
+            "observation.images.image": main_image_tensor.to(torch.float32)/ 255,
+            "observation.images.wrist_image": wrist_image_tensor.to(torch.float32)/ 255,
+            "observation.state": proprio_states['state'].to(torch.float32),
             "task": task_descriptions,
         }
         processed_obs = processor(to_process_input)
         processed_obs.update(
             {
-                "observation.images.image": main_image_tensor / 255,
-                "observation.images.wrist_image": wrist_image_tensor / 255,
-                "observation.state": proprio_states['state'],
+                "observation.images.image": main_image_tensor.to(torch.float32) / 255,
+                "observation.images.wrist_image": wrist_image_tensor.to(torch.float32) / 255,
+                "observation.state": proprio_states['state'].to(torch.float32),
             }
         )
 

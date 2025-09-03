@@ -336,6 +336,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
                     entropy_bonus=self.cfg.algorithm.entropy_bonus,
                     loss_mask=loss_mask,
                     loss_mask_sum=loss_mask_sum,
+                    use_norm_adv=self.cfg.algorithm.get("use_norm_adv", False),
                 )
 
                 loss /= self.gradient_accumulation
@@ -345,26 +346,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
                 append_to_dict(metrics, metrics_data)
 
             torch.cuda.empty_cache()
-            breakpoint()
 
-            # ----------------------TODO: zhihao: add grad norm check------------------------------
-            # from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-            # import torch, math
-            # # 1) FSDP 版本（全局、一致）
-            # fsdp_total_norm = FSDP.clip_grad_norm_(self.model, max_norm=float('inf'))  # 不剪，只取返回的范数
-
-            # # 2) 本地 PyTorch 版本（NO_SHARD 下应与 1) 一致；SHARD 下它只算本地 shard，会变小）
-            # local_total_norm = torch.nn.utils.clip_grad_norm_(
-            #     (p for p in self.model.parameters() if p.grad is not None),  # 只要有梯度的
-            #     max_norm=float('inf')
-            # )
-
-            # if torch.distributed.get_rank() == 0:
-            #     diff = abs(fsdp_total_norm.item() - local_total_norm.item())
-            #     rel = diff / (fsdp_total_norm.item() + 1e-12)
-            #     print(f"[GradNorm] FSDP={fsdp_total_norm.item():.6e} | local={local_total_norm.item():.6e} | "
-            #         f"abs_diff={diff:.3e} rel_diff={rel:.3e}")
-            # --------------------------------------------------------------
             grad_norm = self.model.clip_grad_norm_(
                 max_norm=self.cfg.actor.optim.clip_grad
             )

@@ -153,7 +153,7 @@ class MultiStepRolloutWorker(Worker):
     def init_worker(self):
         self.hf_model = get_model(self.cfg.rollout.model_dir, self.cfg.actor.model)
         self.hf_model.setup_params(self.model_config, self.cfg)
-        self.hf_model.to(self.precision)
+        # self.hf_model.to(self.precision)
         self.hf_model.eval()
         if self.cfg.actor.model.model_name == "pi0":
             # NOTE: process function of pi0 is initialized after model is initialized
@@ -246,6 +246,7 @@ class MultiStepRolloutWorker(Worker):
     def update_env_batch(self, i, env_batch):
         # first step for env_batch
         if env_batch["rews"] is None:
+            breakpoint()
             self.buffer_list[i]["dones"].append(env_batch["dones"].contiguous().cpu())
             return
 

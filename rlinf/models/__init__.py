@@ -196,9 +196,8 @@ def get_model(model_path, cfg: DictConfig, override_config_kwargs=None):
         dataset_meta = LeRobotDatasetMetadata(
             f"lerobot/{model_dir_name}", root=f"data/{model_dir_name}"
         )
-        # Create the Pi0 wrapper model and set the policy
+        # TODO: replace the raw make_policy without the metadata. Create the Pi0 wrapper model and set the policy
         model = make_policy(actor_model_config, policy_class=Pi0ForRLActionPrediction, ds_meta=dataset_meta)
-        model = model.to(torch_dtype)
     else:
         return None
     if torch.cuda.is_available():

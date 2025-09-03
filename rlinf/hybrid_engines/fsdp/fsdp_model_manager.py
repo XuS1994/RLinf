@@ -36,7 +36,13 @@ def should_wrap(module):
     # TODO: zhihao: add PaliGemmaForConditionalGeneration to the should_wrap function
     # TODO cannot import name 'PaliGemmaForConditionalGeneration' from 'transformers' in transformers 4.40.1
     from transformers import PaliGemmaForConditionalGeneration
+    from transformers.models.gemma.modeling_gemma import GemmaDecoderLayer
+    from lerobot.common.policies.normalize import Normalize, Unnormalize
     if isinstance(module, PaliGemmaForConditionalGeneration):
+        return True
+    elif isinstance(module, Normalize) or isinstance(module, Unnormalize):
+        return True
+    elif isinstance(module,GemmaDecoderLayer): 
         return True
     else:
         return False
@@ -117,7 +123,6 @@ class FSDPModelManager:
         auto_wrap_policy = functools.partial(lambda_auto_wrap_policy, lambda_fn=should_wrap)
 
         betas = (self._cfg.optim.adam_beta1, self._cfg.optim.adam_beta2)
-        
         self.model = FSDP(
             module,
             param_init_fn=init_fn,
@@ -125,7 +130,7 @@ class FSDPModelManager:
             auto_wrap_policy=auto_wrap_policy,
             device_id=int(os.environ["LOCAL_RANK"]),
             sharding_strategy=sharding_strategy,  # zero3
-            mixed_precision=mixed_precision,
+            # mixed_precision=mixed_precision,
             sync_module_states=True,
         )
 
@@ -137,7 +142,7 @@ class FSDPModelManager:
                     params_critic.append(param)
                 else:
                     params_actor.append(param)
-
+        
         if len(params_critic) > 0:
             self.optimizer = optim.AdamW([
                 {'params': params_actor, 'lr': self._cfg.optim.lr, 'betas': betas},

@@ -23,7 +23,8 @@ class Pi0ForRLActionPrediction(PI0Policy):
     # @property 
     # def _no_split_modules(self) -> list[str]:
     #     """List of modules that should not be split by FSDP."""
-    #     return ['PaliGemmaMultiModalProjector', 'GemmaRMSNorm', 'GemmaAttention', 'GemmaMLP', 'Linear', 'Embedding']
+    #     # return ['PaliGemmaMultiModalProjector', 'GemmaRMSNorm', 'GemmaAttention', 'GemmaMLP', 'Linear', 'Embedding']
+    #     return ['PaliGemmaForConditionalGeneration', 'Normalize', 'Unnormalize']
 
     def prepare_input(self, batch):
         batch = self.normalize_inputs(batch)
@@ -181,30 +182,30 @@ class Pi0ForRLActionPrediction(PI0Policy):
         self.max_prompt_length = cfg.runner.max_prompt_length
 
     def _generate_one_step(self, obs: dict, mode: Literal["train", "eval"]) -> Dict[str, Any]:  
-        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
-            if mode == "train":
-                rollout_stage = True
-            else:
-                rollout_stage = False
-            
-            actions, chains, token_level_log_probs, values = self.select_multi_actions(obs, rollout_stage=rollout_stage)
-            actions = actions.to(torch.float32).detach().cpu().numpy()
-            # Prepare PI0 diffusion chain data for PPO training
-            batch_size = actions.shape[0]
-            device = token_level_log_probs.device
+        # with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+        if mode == "train":
+            rollout_stage = True
+        else:
+            rollout_stage = False
+        
+        actions, chains, token_level_log_probs, values = self.select_multi_actions(obs, rollout_stage=rollout_stage)
+        actions = actions.to(torch.float32).detach().cpu().numpy()
+        # Prepare PI0 diffusion chain data for PPO training
+        batch_size = actions.shape[0]
+        device = token_level_log_probs.device
 
-            # Generate denoise indices for chains
-            # chains shape: [batch_size, denoise_steps + 1, act_steps, action_dim]
-            # log_probs shape: [batch_size, denoise_steps, act_steps, action_dim]
-            denoise_steps = chains.shape[1] - 1  # chains includes initial noise, so subtract 1
-            denoise_inds = torch.arange(denoise_steps, device=device).unsqueeze(0).repeat(batch_size, 1)
-            batch_output = {
-                "action": actions,
-                "chains": chains,
-                "denoise_inds": denoise_inds,
-                "prev_logprobs": token_level_log_probs,
-                "values": values,
-            }
+        # Generate denoise indices for chains
+        # chains shape: [batch_size, denoise_steps + 1, act_steps, action_dim]
+        # log_probs shape: [batch_size, denoise_steps, act_steps, action_dim]
+        denoise_steps = chains.shape[1] - 1  # chains includes initial noise, so subtract 1
+        denoise_inds = torch.arange(denoise_steps, device=device).unsqueeze(0).repeat(batch_size, 1)
+        batch_output = {
+            "action": actions,
+            "chains": chains,
+            "denoise_inds": denoise_inds,
+            "prev_logprobs": token_level_log_probs,
+            "values": values,
+        }
         return batch_output
     #! has some accuracy loss here
     def _forward_micro_batch(
@@ -216,17 +217,17 @@ class Pi0ForRLActionPrediction(PI0Policy):
         for key in pi0_obs_keys:
             assert key in data, f"Key {key} not found in data"
             pi0_batch[key] = data[key]
-        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+        # with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
             # denoise index
-            length = data['prev_logprobs'].size(0)
-            chains = data['chains']  # [length, denoise_steps + 1, act_steps, action_dim]
-            denoise_inds = data['denoise_inds']
-            chains_pre = chains[torch.arange(length), denoise_inds]  # [length, act_steps, action_dim]
-            chains_next = chains[torch.arange(length), denoise_inds + 1]   # [length, act_steps, action_dim]
-            # logprob calculation
-            token_level_log_probs, _ = self.get_log_prob_value(
-                pi0_batch, chains_pre, chains_next, denoise_inds
-            )
+        length = data['prev_logprobs'].size(0)
+        chains = data['chains']  # [length, denoise_steps + 1, act_steps, action_dim]
+        denoise_inds = data['denoise_inds']
+        chains_pre = chains[torch.arange(length), denoise_inds]  # [length, act_steps, action_dim]
+        chains_next = chains[torch.arange(length), denoise_inds + 1]   # [length, act_steps, action_dim]
+        # logprob calculation
+        token_level_log_probs, _ = self.get_log_prob_value(
+            pi0_batch, chains_pre, chains_next, denoise_inds
+        )
             # todo: debug log-prob
             # with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
             #     loaded_dict = torch.load('debug_variables_1_0.pt', map_location='cuda')  # 加载到GPU
