@@ -104,6 +104,29 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         unnorm_key = self._check_unnorm_key(self.norm_stats, self.unnorm_key)
         return self.norm_stats[unnorm_key]["action"]
 
+    def _prepare_input_for_action_prediction(self, input_ids, attention_mask):
+        """Prepares input for action prediction by adding necessary tokens"""
+        # Add (ACTION_DIM * NUM_ACTIONS_CHUNK) placeholder tokens to input_ids to simulate action tokens
+        placeholder_action_token_ids = (
+            torch.ones((input_ids.shape[0], self.action_dim * self.num_action_chunks)).to(input_ids.device).to(input_ids.dtype)
+        )
+        input_ids = torch.cat([input_ids, placeholder_action_token_ids], dim=-1)
+
+        # Add stop token to sequence (needed in non-causal bi-directional self-attention, as it appears at train time)
+        stop_token_id = torch.ones((input_ids.shape[0], 1)).to(input_ids.device).to(input_ids.dtype) * STOP_INDEX
+        input_ids = torch.cat([input_ids, stop_token_id], dim=-1)
+
+        # Extend the attention mask to fit the new shape of input
+        # Note: Only batch size == 1 supported right now
+        mask_extension = (
+            torch.ones((attention_mask.shape[0], input_ids.shape[-1] - attention_mask.shape[-1]))
+            .to(attention_mask.device)
+            .to(attention_mask.dtype)
+        )
+        attention_mask = torch.cat([attention_mask, mask_extension], dim=-1)
+
+        return input_ids, attention_mask
+
     @torch.no_grad()
     def predict_action_batch(
         self,

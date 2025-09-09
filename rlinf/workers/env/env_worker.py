@@ -142,6 +142,32 @@ class EnvWorker(Worker):
                             enable_offload=enable_offload,
                         )
                     )
+        elif self.cfg.env.train.simulator_type == "RoboTwin":
+            from rlinf.envs.robotwin.RoboTwin_env import RoboTwin
+
+            if not only_eval:
+                for _ in range(self.stage_num):
+                    self.simulator_list.append(
+                        EnvManager(
+                            self.cfg.env.train,
+                            rank=self._rank,
+                            world_size=self._world_size,
+                            env_cls=RoboTwin,
+                            enable_offload=enable_offload,
+                        )
+                        # RoboTwin(self.cfg.env.train, rank=self._rank, world_size=self._world_size)
+                    )
+            if self.cfg.runner.val_check_interval > 0 or only_eval:
+                for _ in range(self.stage_num):
+                    self.eval_simulator_list.append(
+                        EnvManager(
+                            self.cfg.env.eval,
+                            rank=self._rank,
+                            world_size=self._world_size,
+                            env_cls=RoboTwin,
+                            enable_offload=enable_offload,
+                        )
+                    )
 
         if not only_eval:
             self._init_simulator()
