@@ -169,6 +169,33 @@ class PaliGemmaWithExpertConfig(PretrainedConfig):
 
 from peft import get_peft_model
 
+from transformers.models.gemma.modeling_gemma import GemmaDecoderLayer
+class FSDPGemmaDecoderLayer(GemmaDecoderLayer):
+    def __init__(self,cls: GemmaDecoderLayer):
+        for name, value in cls.__dict__.items():
+            if not name.startswith('__') and not callable(value):
+                setattr(self, name, value)
+        
+    def forward(self,batch, mode = "input"):
+        if mode == "input":
+            hidden_states = batch["hidden_states"]
+            hidden_states = self.input_layernorm(hidden_states)
+            input_shape = hidden_states.shape[:-1]
+            hidden_shape = (*input_shape, -1, self.self_attn.head_dim)
+            hidden_states = hidden_states.to(dtype=torch.bfloat16)
+            query_state = self.self_attn.q_proj(hidden_states).view(hidden_shape)
+            key_state = self.self_attn.k_proj(hidden_states).view(hidden_shape)
+            value_state = self.self_attn.v_proj(hidden_states).view(hidden_shape)
+            return query_state, key_state, value_state
+        elif mode == "output":
+            out_emb = self.self_attn.o_proj(batch["att_output"])
+            out_emb += batch["hidden_states"]
+            after_first_residual = out_emb.clone()
+            out_emb = self.post_attention_layernorm(out_emb)
+            out_emb = self.mlp(out_emb)
+            out_emb += after_first_residual
+            return out_emb
+
 class PaliGemmaWithExpertModel(PreTrainedModel):
     config_class = PaliGemmaWithExpertConfig
 
@@ -184,6 +211,10 @@ class PaliGemmaWithExpertModel(PreTrainedModel):
 
         self.to_bfloat16_like_physical_intelligence()
         self.set_requires_grad()
+
+    def replace_gemma_decoder_layer(self):
+        for i, layer in enumerate(self.gemma_expert.model.layers):
+            self.gemma_expert.model.layers[i] = FSDPGemmaDecoderLayer(layer)
 
     def set_requires_grad(self):
         if self.config.freeze_vision_encoder:
@@ -256,16 +287,18 @@ class PaliGemmaWithExpertModel(PreTrainedModel):
                 if hidden_states is None:
                     continue
                 layer = models[i].layers[layer_idx]
-                # normalizer = torch.tensor(models[i].config.hidden_size**0.5, dtype=hidden_states.dtype)
-                # hidden_states = hidden_states * normalizer
-                hidden_states = layer.input_layernorm(hidden_states)
-
-                input_shape = hidden_states.shape[:-1]
-                hidden_shape = (*input_shape, -1, layer.self_attn.head_dim)
-                hidden_states = hidden_states.to(dtype=torch.bfloat16)
-                query_state = layer.self_attn.q_proj(hidden_states).view(hidden_shape)
-                key_state = layer.self_attn.k_proj(hidden_states).view(hidden_shape)
-                value_state = layer.self_attn.v_proj(hidden_states).view(hidden_shape)
+                if i == 0:
+                    # normalizer = torch.tensor(models[i].config.hidden_size**0.5, dtype=hidden_states.dtype)
+                    # hidden_states = hidden_states * normalizer
+                    hidden_states = layer.input_layernorm(hidden_states)
+                    input_shape = hidden_states.shape[:-1]
+                    hidden_shape = (*input_shape, -1, layer.self_attn.head_dim)
+                    hidden_states = hidden_states.to(dtype=torch.bfloat16)
+                    query_state = layer.self_attn.q_proj(hidden_states).view(hidden_shape)
+                    key_state = layer.self_attn.k_proj(hidden_states).view(hidden_shape)
+                    value_state = layer.self_attn.v_proj(hidden_states).view(hidden_shape)
+                elif i == 1:
+                    query_state, key_state, value_state = layer({"hidden_states":hidden_states},mode = "input")
 
                 query_states.append(query_state)
                 key_states.append(key_state)
@@ -316,21 +349,28 @@ class PaliGemmaWithExpertModel(PreTrainedModel):
 
                     if att_output.dtype != layer.self_attn.o_proj.weight.dtype:
                         att_output = att_output.to(layer.self_attn.o_proj.weight.dtype)
-                    out_emb = layer.self_attn.o_proj(att_output[:, start:end])
+                    if i == 0:
+                        out_emb = layer.self_attn.o_proj(att_output[:, start:end])
 
-                    # TODO: first dropout (by default 0.0)
+                        # TODO: first dropout (by default 0.0)
 
-                    # first residual
-                    out_emb += hidden_states
-                    after_first_residual = out_emb.clone()
+                        # first residual
+                        out_emb += hidden_states
+                        after_first_residual = out_emb.clone()
 
-                    out_emb = layer.post_attention_layernorm(out_emb)
-                    out_emb = layer.mlp(out_emb)
+                        out_emb = layer.post_attention_layernorm(out_emb)
+                        out_emb = layer.mlp(out_emb)
 
-                    # TODO: second dropout (by default 0.0)
+                        # TODO: second dropout (by default 0.0)
 
-                    # second residual
-                    out_emb += after_first_residual
+                        # second residual
+                        out_emb += after_first_residual
+                    elif i == 1:
+                        out_emb = layer({
+                            "hidden_states":hidden_states,
+                            "att_output":att_output[:, start:end]},
+                            mode = "output"
+                        )
 
                     outputs_embeds.append(out_emb)
 

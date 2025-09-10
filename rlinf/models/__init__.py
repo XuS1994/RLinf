@@ -198,6 +198,8 @@ def get_model(model_path, cfg: DictConfig, override_config_kwargs=None):
         )
         # TODO: replace the raw make_policy without the metadata. Create the Pi0 wrapper model and set the policy
         model = make_policy(actor_model_config, policy_class=Pi0ForRLActionPrediction, ds_meta=dataset_meta)
+        # TODO: solve fsdp bug
+        model.model.paligemma_with_expert.replace_gemma_decoder_layer() 
     else:
         return None
     if torch.cuda.is_available():

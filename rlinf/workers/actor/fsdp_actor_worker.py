@@ -40,12 +40,11 @@ from rlinf.utils.data_iter_utils import get_iterator_k_split
 from rlinf.utils.distributed import all_reduce_dict
 from rlinf.utils.placement import HybridComponentPlacement
 
-
+    
 class EmbodiedFSDPActor(FSDPModelManager, Worker):
     def __init__(self, cfg: DictConfig):
         Worker.__init__(self)
         super().__init__(cfg.actor)
-
         self.cfg = cfg
         torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
         self.device = torch.cuda.current_device()
@@ -111,27 +110,37 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
     async def recv_rollout_batch(self):
         send_num = self._component_placement.get_world_size("rollout") * self.stage_num
         recv_num = self._component_placement.get_world_size("actor")
-        split_num = compute_split_num(send_num, recv_num)
-
-        self.rollout_batch = {}
-        recv_list = []
-        for i in range(split_num):
-            recv_list.append(
-                await self.channel.get(
-                    queue_name=self._replay_buffer_name, async_op=True
-                ).async_wait()
-            )
-
-        # shape [num_chunk, bsz, chunk_size], cat dim 1
-        for key in recv_list[0].keys():
-            if "env_info/" not in key:
-                self.rollout_batch[key] = torch.cat(
-                    [recv_list[i][key] for i in range(split_num)], dim=1
+        # TODO: zhihao: currently only support self.stage_num == 1
+        # 如果 send_num == recv_num，每个 actor 只从对应 rank 的队列中接收数据
+        if send_num == recv_num:
+            # 从与当前 actor rank 对应的队列中接收数据
+            target_queue_name = f"{self._replay_buffer_name}_{self._rank}"
+            rollout_batch = await self.channel.get(
+                queue_name=target_queue_name, async_op=True
+            ).async_wait()
+            self.rollout_batch = rollout_batch
+        else:
+            # 原有的数据接收和拼接逻辑
+            split_num = compute_split_num(send_num, recv_num)
+            self.rollout_batch = {}
+            recv_list = []
+            for i in range(split_num):
+                recv_list.append(
+                    await self.channel.get(
+                        queue_name=self._replay_buffer_name, async_op=True
+                    ).async_wait()
                 )
-            else:
-                self.rollout_batch[key] = torch.cat(
-                    [recv_list[i][key] for i in range(split_num)], dim=0
-                )
+
+            # shape [num_chunk, bsz, chunk_size], cat dim 1
+            for key in recv_list[0].keys():
+                if "env_info/" not in key:
+                    self.rollout_batch[key] = torch.cat(
+                        [recv_list[i][key] for i in range(split_num)], dim=1
+                    )
+                else:
+                    self.rollout_batch[key] = torch.cat(
+                        [recv_list[i][key] for i in range(split_num)], dim=0
+                    )
 
         self.rollout_batch = self._process_received_rollout_batch(self.rollout_batch)
 
@@ -157,11 +166,60 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
         ):
             dones = rollout_batch[
                 "dones"
-            ]  # [n_chunk_step, rollout_epoch x bsz, num_action_chunks]
+            ]  # [n_chunk_step, rollout_epoch x bsz, num_action_chunks] 
             loss_mask, loss_mask_sum = compute_loss_mask(dones)
 
             rollout_batch["loss_mask"] = loss_mask
             rollout_batch["loss_mask_sum"] = loss_mask_sum
+
+        # filter data by rewards
+        if self.cfg.algorithm.get("filter_rewards", False):
+            rewards = rollout_batch[
+                "rewards"
+            ]  # [n_chunk_step, batch, num_action_chunks]
+            if self.rollout_batch.get("loss_mask", None) is not None:
+                rewards = rewards * rollout_batch["loss_mask"]
+            n_chunk_step, batch_size, num_action_chunks = rewards.shape
+
+            group_size = self.cfg.algorithm.group_size
+            assert batch_size % group_size == 0, (
+                f"batch {batch_size} not divisible by group_size {group_size}"
+            )
+            n_prompts = batch_size // group_size
+
+            # calculate rewards by prompt
+            rewards = rewards.transpose(
+                0, 1
+            )  # [batch, n_chunk_step, num_action_chunks]
+            rewards = rewards.reshape(rewards.shape[0], -1)  # [batch, n_step]
+            reward_matrix = rewards.reshape(
+                n_prompts, group_size, rewards.shape[-1]
+            )  # [n_prompts, group_size, n_step]
+            reward_matrix = reward_matrix.sum(dim=-1)  # [n_prompts, group_size]
+            mean_reward_in_group = reward_matrix.mean(dim=1)  # [n_prompts]
+
+            # mask
+            reward_filter_mask = (
+                mean_reward_in_group >= self.cfg.algorithm.rewards_lower_bound
+            ) & (
+                mean_reward_in_group <= self.cfg.algorithm.rewards_upper_bound
+            )  # [n_prompts]
+
+            # extend mask dimension
+            reward_filter_mask = reward_filter_mask.repeat_interleave(
+                group_size
+            )  # [batch]
+            reward_filter_mask = (
+                reward_filter_mask.unsqueeze(0).expand(n_chunk_step, -1).unsqueeze(-1)
+            )  # [n_chunk_step, batch, 1]
+
+            # update loss_mask
+            if self.rollout_batch.get("loss_mask", None) is not None:
+                rollout_batch["loss_mask"] = (
+                    reward_filter_mask & self.rollout_batch["loss_mask"]
+                )
+            else:
+                rollout_batch["loss_mask"] = reward_filter_mask
 
         return rollout_batch
 
@@ -244,130 +302,144 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
         assert rollout_size % batch_size_per_rank == 0, (
             f"{rollout_size} is not divisible by {batch_size_per_rank}"
         )
-        rollout_dataloader_iter = get_iterator_k_split(
-            self.rollout_batch,
-            rollout_size // batch_size_per_rank,
-        )
-
+        update_epoch = self.cfg.algorithm.get("update_epoch", 1)
         metrics = {}
-        for _, train_global_batch in tqdm(
-            enumerate(rollout_dataloader_iter), desc="get loss and metrics"
-        ):
-            # split batch into micro_batches
-            train_global_batch_size = train_global_batch["prev_logprobs"].shape[0]
-            assert (
-                train_global_batch_size
-                == self.cfg.actor.global_batch_size
-                // torch.distributed.get_world_size()
+        for _ in range(update_epoch):
+            rollout_dataloader_iter = get_iterator_k_split(
+                self.rollout_batch,
+                rollout_size // batch_size_per_rank,
             )
-            assert train_global_batch_size % self.cfg.actor.micro_batch_size == 0, (
-                f"{train_global_batch_size=}, {self.cfg.actor.micro_batch_size}"
-            )
-            train_micro_batch = get_iterator_k_split(
-                train_global_batch,
-                train_global_batch_size // self.cfg.actor.micro_batch_size,
-            )
-
-            self.optimizer.zero_grad()
-            for data_idx, data in enumerate(train_micro_batch):
-                for k, v in data.items():
-                    data[k] = v.to(f"cuda:{int(os.environ['LOCAL_RANK'])}")
-                data = self.model.preprocess_for_train(data)
-                if self.cfg.actor.model.model_name == "pi0":
-                    data_size = data["prev_logprobs"].shape[0]
-                    # NOTE : random select one step to optimize
-                    denoise_inds = torch.randint(0, self.cfg.actor.model.num_steps, (data_size,))
-                    data["denoise_inds"] = denoise_inds # TODO: add mix mode
-                    data["prev_logprobs"] = data["prev_logprobs"][torch.arange(data_size), denoise_inds]
-                    output_dict = self.model(data, mode="compute_logprob")
-                else:
-                    input_ids = data["input_ids"]
-                    action_tokens = data["action_tokens"]
-                    attention_mask = data["attention_mask"]
-                    pixel_values = data["pixel_values"]
-
-                    action_token_len = self.model.action_dim * self.model.num_action_chunks
-
-                    logits_processor_args = {
-                        "action_tokens": action_tokens,
-                        "vocab_size": self.model.vocab_size,
-                        "n_action_bins": self.model.config.n_action_bins,
-                    }
-
-                    output_dict = custom_forward(
-                        self.model,
-                        input_ids=input_ids,
-                        attention_mask=attention_mask,
-                        pixel_values=pixel_values,
-                        action_token_len=action_token_len,
-                        value_model=True if self.cfg.algorithm.adv_type == "ppo" else False,
-                        value_head_mode=self.cfg.actor.model.get("vh_mode", None),
-                        temperature=self.cfg.algorithm.sampling_params.temperature_train,
-                        top_k=self.cfg.algorithm.sampling_params.top_k,
-                        logits_processor_args=logits_processor_args,
-                    )
-
-                logprobs = output_dict["logprobs"]
-                entropy = output_dict["entropy"]
-                values = output_dict.get("values", None)
-                prev_logprobs = data["prev_logprobs"]
-                advantages = data["advantages"]  # [bsz, chunk-step]
-                prev_values = data["prev_values"]
-                returns = data.get("returns", None)  # [bsz, chunk-step]
-                loss_mask = data.get("loss_mask", None)
-                loss_mask_sum = data.get("loss_mask_sum", None)
-
-                loss, metrics_data = actor_loss_fn(
-                    self.cfg.algorithm.loss_type,
-                    self.cfg.algorithm.logprob_type,
-                    self.cfg.algorithm.entropy_type,
-                    single_action_dim=self.cfg.actor.model.action_dim,
-                    logprobs=logprobs,
-                    entropy=entropy,
-                    values=values,
-                    old_logprobs=prev_logprobs,
-                    advantages=advantages,
-                    returns=returns,
-                    prev_values=prev_values,
-                    clip_ratio_high=self.cfg.algorithm.clip_ratio_high,
-                    clip_ratio_low=self.cfg.algorithm.clip_ratio_low,
-                    value_clip=self.cfg.algorithm.get("value_clip", None),
-                    huber_delta=self.cfg.algorithm.get("huber_delta", None),
-                    entropy_bonus=self.cfg.algorithm.entropy_bonus,
-                    loss_mask=loss_mask,
-                    loss_mask_sum=loss_mask_sum,
-                    use_norm_adv=self.cfg.algorithm.get("use_norm_adv", False),
+            
+            for _, train_global_batch in tqdm(
+                enumerate(rollout_dataloader_iter), desc="get loss and metrics"
+            ):
+                # split batch into micro_batches
+                train_global_batch_size = train_global_batch["prev_logprobs"].shape[0]
+                assert (
+                    train_global_batch_size
+                    == self.cfg.actor.global_batch_size
+                    // torch.distributed.get_world_size()
+                )
+                assert train_global_batch_size % self.cfg.actor.micro_batch_size == 0, (
+                    f"{train_global_batch_size=}, {self.cfg.actor.micro_batch_size}"
+                )
+                train_micro_batch = get_iterator_k_split(
+                    train_global_batch,
+                    train_global_batch_size // self.cfg.actor.micro_batch_size,
                 )
 
-                loss /= self.gradient_accumulation
-                loss.backward()
+                self.optimizer.zero_grad()
+                for data_idx, data in enumerate(train_micro_batch):
+                    for k, v in data.items():
+                        data[k] = v.to(f"cuda:{int(os.environ['LOCAL_RANK'])}")
+                    data = self.model.preprocess_for_train(data)
+                    # todo: ppo check new-advs with the mean prev new-advs
+                    if self.cfg.actor.model.model_name == "pi0":
+                        data_size = data["prev_logprobs"].shape[0]
+                        # NOTE : random select one step to optimize
+                        denoise_inds = torch.randint(0, self.cfg.actor.model.num_steps, (data_size,))
+                        data["denoise_inds"] = denoise_inds # TODO: add mix mode
+                        data["prev_logprobs"] = data["prev_logprobs"][torch.arange(data_size), denoise_inds]
+                        # METHOD1
+                        output_dict = self.model(data, mode="compute_logprob")
+                        # METHOD2
+                        # output_dict = self.model._forward_micro_batch(data)
+                    else:
+                        input_ids = data["input_ids"]
+                        action_tokens = data["action_tokens"]
+                        attention_mask = data["attention_mask"]
+                        pixel_values = data["pixel_values"]
 
-                metrics_data["loss"] = loss.detach().item()
-                append_to_dict(metrics, metrics_data)
+                        action_token_len = self.model.action_dim * self.model.num_action_chunks
 
-            torch.cuda.empty_cache()
+                        logits_processor_args = {
+                            "action_tokens": action_tokens,
+                            "vocab_size": self.model.vocab_size,
+                            "n_action_bins": self.model.config.n_action_bins,
+                        }
 
-            grad_norm = self.model.clip_grad_norm_(
-                max_norm=self.cfg.actor.optim.clip_grad
-            )
-            self.optimizer.step()
+                        output_dict = custom_forward(
+                            self.model,
+                            input_ids=input_ids,
+                            attention_mask=attention_mask,
+                            pixel_values=pixel_values,
+                            action_token_len=action_token_len,
+                            value_model=True if self.cfg.algorithm.adv_type == "ppo" else False,
+                            value_head_mode=self.cfg.actor.model.get("vh_mode", None),
+                            temperature=self.cfg.algorithm.sampling_params.temperature_train,
+                            top_k=self.cfg.algorithm.sampling_params.top_k,
+                            logits_processor_args=logits_processor_args,
+                        )
 
-            self.optimizer.zero_grad()
-            data = {
-                "actor/grad_norm": grad_norm.detach().item(),
-                "actor/lr": self.optimizer.param_groups[0]["lr"],
-            }
-            if self.cfg.algorithm.adv_type == "ppo":
-                data["critic/lr"] = self.optimizer.param_groups[1]["lr"]
-            append_to_dict(metrics, data)
+                    logprobs = output_dict["logprobs"]
+                    entropy = output_dict["entropy"]
+                    values = output_dict.get("values", None)
+                    prev_logprobs = data["prev_logprobs"]
+                    advantages = data["advantages"]  # [bsz, chunk-step]
+                    prev_values = data["prev_values"]
+                    returns = data.get("returns", None)  # [bsz, chunk-step]
+                    loss_mask = data.get("loss_mask", None)
+                    loss_mask_sum = data.get("loss_mask_sum", None)
+
+                    loss, metrics_data = actor_loss_fn(
+                        self.cfg.algorithm.loss_type,
+                        self.cfg.algorithm.logprob_type,
+                        self.cfg.algorithm.entropy_type,
+                        single_action_dim=self.cfg.actor.model.action_dim,
+                        logprobs=logprobs,
+                        entropy=entropy,
+                        values=values,
+                        old_logprobs=prev_logprobs,
+                        advantages=advantages,
+                        returns=returns,
+                        prev_values=prev_values,
+                        clip_ratio_high=self.cfg.algorithm.clip_ratio_high,
+                        clip_ratio_low=self.cfg.algorithm.clip_ratio_low,
+                        value_clip=self.cfg.algorithm.get("value_clip", None),
+                        huber_delta=self.cfg.algorithm.get("huber_delta", None),
+                        entropy_bonus=self.cfg.algorithm.entropy_bonus,
+                        loss_mask=loss_mask,
+                        loss_mask_sum=loss_mask_sum,
+                        use_norm_adv=self.cfg.algorithm.get("use_norm_adv", False),
+                    )
+
+                    loss /= self.gradient_accumulation
+                    loss.backward()
+
+                    metrics_data["loss"] = loss.detach().item()
+                    append_to_dict(metrics, metrics_data)
+
+                # TODO: zhihao: check if empty cache is needed
+                # torch.cuda.empty_cache()
+                
+                grad_norm = self.model.clip_grad_norm_(
+                    max_norm=self.cfg.actor.optim.clip_grad
+                )
+                self.optimizer.step()
+
+                self.optimizer.zero_grad()
+                data = {
+                    "actor/grad_norm": grad_norm.detach().item(),
+                    "actor/lr": self.optimizer.param_groups[0]["lr"],
+                }
+                if self.cfg.algorithm.adv_type == "ppo":
+                    data["critic/lr"] = self.optimizer.param_groups[1]["lr"]
+                append_to_dict(metrics, data)
         mean_metric_dict = {key: np.mean(value) for key, value in metrics.items()}
         loss_task = mean_metric_dict["actor/raw_loss"]
         valid_sample_num = mean_metric_dict.pop("valid_sample_num")
+        grad_norm = mean_metric_dict["actor/grad_norm"].copy()
         mean_metric_dict = all_reduce_dict(
             mean_metric_dict, op=torch.distributed.ReduceOp.AVG
         )
         mean_metric_dict[f"per_task_loss/task_{self._rank}"] = loss_task
         mean_metric_dict[f"per_task_valid_sample/task_{self._rank}"] = valid_sample_num
+        mean_metric_dict[f"per_task_grad_norm/task_{self._rank}"] = grad_norm
+        sum_params = 0
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                sum_params += param.sum()
+        mean_metric_dict[f"per_task_params/task_{self._rank}"] = sum_params
         self.optimizer.zero_grad()
         torch.cuda.synchronize()
         torch.distributed.barrier()

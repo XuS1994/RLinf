@@ -468,7 +468,6 @@ class PI0FlowMatching(nn.Module):
         self.set_requires_grad()
 
     def set_requires_grad(self):
-        self.paligemma_with_expert.set_requires_grad()
         for params in self.state_proj.parameters():
             params.requires_grad = self.config.train_state_proj
 

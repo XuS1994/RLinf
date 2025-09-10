@@ -156,6 +156,10 @@ class Pi0ForRLActionPrediction(PI0Policy):
             log_probs = batch_output["prev_logprobs"]
             values = batch_output["values"]
             denoise_inds = batch_output["denoise_inds"]
+            # for pi0 ppo value prediction
+            # TODO: ppo
+            values = torch.mean(values,dim = -1,keepdim = True)
+            # values = values[:,2:3]
             return {
                 "actions": actions,
                 "chains": chains,
@@ -212,11 +216,13 @@ class Pi0ForRLActionPrediction(PI0Policy):
         self, 
         data
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        # TODO: DEBUG, chenk modify here
         pi0_batch = {}
-        pi0_obs_keys = ["observation.images.image", "observation.images.wrist_image", "observation.state",  "lang_tokens", "lang_masks"]
+        pi0_obs_keys = ["observation.images.image", "observation.images.wrist_image", "observation.state",  "lang_tokens", "lang_masks", "task"]
         for key in pi0_obs_keys:
-            assert key in data, f"Key {key} not found in data"
-            pi0_batch[key] = data[key]
+            if key in data.keys():
+                pi0_batch[key] = data[key]
+
         # with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
             # denoise index
         length = data['prev_logprobs'].size(0)
@@ -225,7 +231,7 @@ class Pi0ForRLActionPrediction(PI0Policy):
         chains_pre = chains[torch.arange(length), denoise_inds]  # [length, act_steps, action_dim]
         chains_next = chains[torch.arange(length), denoise_inds + 1]   # [length, act_steps, action_dim]
         # logprob calculation
-        token_level_log_probs, _ = self.get_log_prob_value(
+        token_level_log_probs, values = self.get_log_prob_value(
             pi0_batch, chains_pre, chains_next, denoise_inds
         )
             # todo: debug log-prob
@@ -243,7 +249,7 @@ class Pi0ForRLActionPrediction(PI0Policy):
             #     token_level_log_probs = token_level_log_probs.sum(dim=-1)
             #     print(torch.exp(token_level_log_probs - data['prev_logprobs'][torch.arange(length), denoise_inds]))
             # todo: debug log-prob 
-        return {"entropy": None, "logprobs": token_level_log_probs, "values": None}
+        return {"entropy": None, "logprobs": token_level_log_probs, "values": values}
 
 
     def process_tensor(self, tensor, pad_id):

@@ -269,7 +269,6 @@ def actor_loss_fn(
     bsz = log_probs.shape[0]
     logratio = log_probs - old_log_prob
     ratio = torch.exp(logratio)
-    breakpoint()
     if use_norm_adv:
         if loss_mask is not None:
             adv_mean = advantages[loss_mask].mean()

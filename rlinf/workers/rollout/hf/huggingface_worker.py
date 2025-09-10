@@ -115,11 +115,10 @@ def create_rollout_batch(data):
             ret_data[key] = torch.cat(value, dim=0).contiguous().cpu()
     return ret_data
 
-
+    
 class MultiStepRolloutWorker(Worker):
     def __init__(self, cfg: DictConfig):
         Worker.__init__(self)
-
         self.cfg = cfg
         self._env_group_name = cfg.env.group_name
         self._actor_group_name = cfg.actor.group_name
@@ -139,6 +138,15 @@ class MultiStepRolloutWorker(Worker):
 
         self._component_placement = HybridComponentPlacement(cfg)
         self.channel = self.connect_channel(cfg.rollout.channel.name)
+        # TODO: rollout & actor align for pi0
+        send_num = self._component_placement.get_world_size("rollout") * self.stage_num
+        recv_num = self._component_placement.get_world_size("actor")
+        {self._replay_buffer_name}
+        if send_num == recv_num:
+            for i in range(send_num):
+                self.channel.create_queue(
+                    f"{self._replay_buffer_name}_{i}", maxsize=cfg.rollout.channel.queue_size
+                )
         for i in range(self._component_placement.get_world_size("rollout")):
             self.channel.create_queue(
                 f"{self._action_queue_name}_{i}", maxsize=cfg.rollout.channel.queue_size
@@ -153,7 +161,7 @@ class MultiStepRolloutWorker(Worker):
     def init_worker(self):
         self.hf_model = get_model(self.cfg.rollout.model_dir, self.cfg.actor.model)
         self.hf_model.setup_params(self.model_config, self.cfg)
-        # self.hf_model.to(self.precision)
+        # !: self.hf_model.to(self.precision)
         self.hf_model.eval()
         if self.cfg.actor.model.model_name == "pi0":
             # NOTE: process function of pi0 is initialized after model is initialized
@@ -246,7 +254,6 @@ class MultiStepRolloutWorker(Worker):
     def update_env_batch(self, i, env_batch):
         # first step for env_batch
         if env_batch["rews"] is None:
-            breakpoint()
             self.buffer_list[i]["dones"].append(env_batch["dones"].contiguous().cpu())
             return
 
@@ -356,7 +363,6 @@ class MultiStepRolloutWorker(Worker):
                     if "episode" in infos:
                         for key, value in infos["episode"].items():
                             self.buffer_list[i][f"env_info/{key}"].append(value.cpu())
-
         for i in range(self.stage_num):
             await self.send_rollout_batch(i)
 
@@ -440,19 +446,32 @@ class MultiStepRolloutWorker(Worker):
         # send rollout_batch to actor
         send_num = self._component_placement.get_world_size("rollout") * self.stage_num
         recv_num = self._component_placement.get_world_size("actor")
-        split_num = compute_split_num(recv_num, send_num)
-        rollout_batch = create_rollout_batch(self.buffer_list[stage_id])
-        for i in range(split_num):
-            rollout_batch_i = {}
-            for key in rollout_batch.keys():
-                if "env_info/" not in key:
-                    rollout_batch_i[key] = torch.chunk(
-                        rollout_batch[key], split_num, dim=1
-                    )[i].contiguous()
-                else:
-                    rollout_batch_i[key] = torch.chunk(
-                        rollout_batch[key], split_num, dim=0
-                    )[i].contiguous()
+        # TODO: zhihao: currently only support self.stage_num == 1
+        # 如果 send_num == recv_num，每个 rollout worker 只发送数据到对应 rank 的 actor
+        if send_num == recv_num:
+            rollout_batch = create_rollout_batch(self.buffer_list[stage_id])
+            # 发送到与当前 rollout worker rank 对应的队列，实现 1:1 映射
+            target_queue_name = f"{self._replay_buffer_name}_{self._rank}"
             await self.channel.put(
-                item=rollout_batch_i, queue_name=self._replay_buffer_name, async_op=True
+                item=rollout_batch, queue_name=target_queue_name, async_op=True
             ).async_wait()
+            # print(self._rank)
+            # print("rollout_batch['observation.state'].mean()", rollout_batch['observation.state'].mean())
+        else:
+            # 原有的数据分割和分发逻辑
+            split_num = compute_split_num(recv_num, send_num)
+            rollout_batch = create_rollout_batch(self.buffer_list[stage_id])
+            for i in range(split_num):
+                rollout_batch_i = {}
+                for key in rollout_batch.keys():
+                    if "env_info/" not in key:
+                        rollout_batch_i[key] = torch.chunk(
+                            rollout_batch[key], split_num, dim=1
+                        )[i].contiguous()
+                    else:
+                        rollout_batch_i[key] = torch.chunk(
+                            rollout_batch[key], split_num, dim=0
+                        )[i].contiguous()
+                await self.channel.put(
+                    item=rollout_batch_i, queue_name=self._replay_buffer_name, async_op=True
+                ).async_wait()

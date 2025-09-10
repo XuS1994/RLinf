@@ -261,10 +261,10 @@ def actor_loss_fn(
         old_logprobs = old_logprobs.reshape(bsz, -1, single_action_dim).mean(dim=[1,2])
         advantages = advantages.mean(dim=-1)
         loss_mask = loss_mask.max(dim=-1)[0]
-        n_chunk_step = loss_mask_sum.shape[1]
-        loss_mask_sum = loss_mask_sum.float().mean(dim=-1)
-        loss_mask_sum = loss_mask_sum / n_chunk_step
-        loss_mask_sum = torch.ceil(loss_mask_sum)
+        # n_chunk_step = loss_mask_sum.shape[1]
+        # loss_mask_sum = loss_mask_sum.float().mean(dim=-1)
+        # loss_mask_sum = loss_mask_sum / n_chunk_step
+        # loss_mask_sum = torch.ceil(loss_mask_sum)
 
     if loss_type == "grpo":
         from rlinf.algorithms.embodiment.grpo_functions import actor_loss_fn
@@ -302,4 +302,6 @@ def actor_loss_fn(
             value_clip=value_clip,
             huber_delta=huber_delta,
             entropy_bonus=entropy_bonus,
+            use_norm_adv=use_norm_adv,
+            loss_mask=loss_mask,
         )
