@@ -52,7 +52,6 @@ def main(cfg) -> None:
     env_group = EnvWorker.create_group(cfg).launch(
         cluster, name=cfg.env.group_name, placement_strategy=env_placement
     )
-
     runner = EmbodiedRunner(
         cfg=cfg,
         actor=actor_group,
@@ -62,7 +61,6 @@ def main(cfg) -> None:
 
     runner.init_workers()
     runner.run()
-
 
 if __name__ == "__main__":
     main()

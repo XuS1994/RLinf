@@ -3,8 +3,8 @@ export EMBODIED_PATH="$( cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export REPO_PATH=$(dirname $(dirname "$EMBODIED_PATH"))
 export SRC_FILE="${EMBODIED_PATH}/train_embodied_agent.py"
 
-export MUJOCO_GL="osmesa"
-export PYOPENGL_PLATFORM="osmesa"
+export MUJOCO_GL="egl"
+export PYOPENGL_PLATFORM="egl"
 export PYTHONPATH=${REPO_PATH}
 # NOTE: set LIBERO_REPO_PATH to the path of the LIBERO repo
 export PYTHONPATH="/mnt/mnt/public/mjwei/repo/LIBERO":$PYTHONPATH
@@ -19,7 +19,7 @@ export HYDRA_FULL_ERROR=1
 
 
 if [ -z "$1" ]; then
-    CONFIG_NAME="libero_grpo_pi0_rank2"
+    CONFIG_NAME="libero_ppo_pi0"
 else
     CONFIG_NAME=$1
 fi

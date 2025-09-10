@@ -1,6 +1,6 @@
 defaults:
   - env/train: libero_spatial
-  - env/eval: libero_10
+  - env/eval: libero_spatial
   - override hydra/job_logging: stdout
 
 hydra:
@@ -12,11 +12,11 @@ hydra:
 
 cluster:
   num_nodes: 1
-  num_gpus_per_node: 4
+  num_gpus_per_node: 8
   component_placement:
-    actor: 0-3
-    env: 2-3
-    rollout: 0-1
+    actor: 0-7
+    env: 0-7
+    rollout: 0-7
 
 runner:
   task_type: embodied
@@ -30,15 +30,16 @@ runner:
       project_name: "infini-rl"
       experiment_name: "test_pi0"
 
-  max_epochs: 5
+  max_epochs: 1000
   max_steps: -1
 
-  val_check_interval: -1
+  val_check_interval: 5
   save_interval: 1000
   seq_length: 4096
   max_prompt_length: 50
 
 algorithm:
+  update_epoch: 3
   auto_reset: False
   ignore_terminations: False
   use_fixed_reset_state_ids: True
@@ -46,18 +47,16 @@ algorithm:
   shuffle_samples: True
   normalize_advantages: True
   kl_penalty: kl  # how to estimate kl divergence: kl or kl_penalty
-  group_size: 2
-  n_chunk_steps: 32
-  n_eval_chunk_steps: 32
-  n_steps: 10 # TODO: 1 for temporary test
-  n_eval_steps: 10
+  group_size: 8
+  n_chunk_steps: 48
+  n_eval_chunk_steps: 48
   # training generation mbs
   rollout_micro_batch_size: 64
-  num_group_envs: 4  # TODO: large rollout bsz (= group_size*num_group_envs) will cause OOM
-  rollout_epoch: 1
+  num_group_envs: 16  # TODO: large rollout bsz (= group_size*num_group_envs) will cause OOM
+  rollout_epoch: 4
 
   reward_type: chunk_level
-  logprob_type: "token_level"
+  logprob_type: "chunk_level" # TODO: zhihao : check these three type settings 
   entropy_type: "token_level"
 
   # mbs to do log prob inference, can be set to
@@ -75,6 +74,7 @@ algorithm:
   clip_ratio_c: 3.0
   gamma: 0.99
   gae_lambda: 0.95
+  use_norm_adv: True
   # params for generation
   sampling_params:
     use_greedy: False
@@ -108,7 +108,7 @@ rollout:
     queue_size: 0
   mode: "colocate"
   generation_backend: "huggingface"
-  model_dir: "/mnt/mnt/public/mjwei/download_models/lerobot/pi0/" #"/mnt/mnt/public/mjwei/download_models/lerobot/pi0/"
+  model_dir: "/mnt/mnt/public/liuzhihao/libero_sft_model_all/sft/libero_spatial_lerobot/few_1/checkpoints/030000/pretrained_model"
   recompute_logprobs: False
   unnorm_key: libero_10
   enable_offload: False
@@ -125,11 +125,11 @@ actor:
     queue_name: "replay_buffer"
     queue_size: 0
   training_backend: "fsdp"
-  checkpoint_load_path: "/mnt/mnt/public/mjwei/download_models/lerobot/pi0/" #"/mnt/mnt/public/mjwei/download_models/lerobot/pi0/"
-  checkpoint_save_path: "/mnt/mnt/public/xusi/result"
-  micro_batch_size: 2
-  global_batch_size: 16
-  seed: 1234
+  checkpoint_load_path: "/mnt/mnt/public/liuzhihao/libero_sft_model_all/sft/libero_spatial_lerobot/few_1/checkpoints/030000/pretrained_model"
+  checkpoint_save_path: "/mnt/mnt/public/liuzhihao/result"
+  micro_batch_size: 64
+  global_batch_size: 512 # maximun : global batch size = micro batch size * actor num_processes.
+  seed: 42
   enable_offload: False
 
   model:
@@ -139,7 +139,7 @@ actor:
     chunk_size: 50 #! pi0 doesn't actually use this, n_action_steps is chunk_size here
     n_action_steps: 50
 
-    adv_method: "gae"
+    adv_method: "grpo"
     # sample mode for the policy, during the rollout stage, we use sde default
     sample_mode: "ode"  
     noise_level: 0.5 
@@ -162,7 +162,7 @@ actor:
     num_steps: 3 
 
     # action chunk size
-    act_steps: 10
+    act_steps: 5
     # Attention utils
     use_cache: True
     attention_implementation: "eager"  # or fa2, flex
@@ -206,8 +206,8 @@ actor:
     trust_remote_code: True
 
   optim:
-    lr: 1.0e-4
-    value_lr: 3.0e-3
+    lr: 2.0e-6
+    value_lr: 1.0e-4
     adam_beta1: 0.9
     adam_beta2: 0.95
     adam_eps: 1.0e-05
@@ -216,7 +216,7 @@ actor:
   tokenizer:
     tokenizer_type: "HuggingFaceTokenizer"
     # TODO: Update to PI0 model path when available
-    tokenizer_model: "/mnt/mnt/public/mjwei/download_models/lerobot/pi0/"
+    tokenizer_model: "/mnt/mnt/public/liuzhihao/libero_sft_model_all/sft/libero_spatial_lerobot/few_1/checkpoints/030000/pretrained_model"
     extra_vocab_size: 421
     use_fast: False
     trust_remote_code: True

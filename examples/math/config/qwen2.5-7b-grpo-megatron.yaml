@@ -189,7 +189,7 @@ actor:
     overlap_param_gather: True
     optimizer_enable_pin: false
     overlap_param_gather_with_optimizer_step: False
-    clip_grad: 1.0
+    clip_grad: 0.5
     loss_scale_window: 5
     
   lr_sched:

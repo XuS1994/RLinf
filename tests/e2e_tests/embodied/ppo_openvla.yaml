@@ -171,7 +171,7 @@ actor:
     adam_beta1: 0.9
     adam_beta2: 0.95
     adam_eps: 1.0e-05
-    clip_grad: 1.0
+    clip_grad: 0.5
 
 reward:
   use_reward_model: False
