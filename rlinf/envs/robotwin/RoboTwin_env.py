@@ -399,7 +399,6 @@ class RoboTwin(gym.Env):
         self.share_seed = self.context.Value('i', self.seed)
         self.share_actions = self.context.Array('d', self.args['n_envs'] * self.args['input_size'])
         self.share_results = self.context.Array('d', self.args['n_envs'] * self.args['result_size'])
-        # self.temp_worker = worker(0, self.task_name, self.args, self.share_seed, self.share_actions, self.share_results, self.input_sem, self.output_sem, self.reset_event)
         for i in range(self.n_envs):
             os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
             os.environ['TORCH_CUDA_ARCH_LIST'] = "8.0"
@@ -450,7 +449,6 @@ class RoboTwin(gym.Env):
         return
 
     def transform(self, results):
-        # TODO resize image to 224x224
         def jpeg_mapping(img):
             if img is None:
                 return None

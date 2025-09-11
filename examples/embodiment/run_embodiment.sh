@@ -6,7 +6,7 @@ export SRC_FILE="${EMBODIED_PATH}/train_embodied_agent.py"
 
 export MUJOCO_GL="egl"
 export PYOPENGL_PLATFORM="egl"
-export PYTHONPATH=${REPO_PATH}:"/mnt/public/xusi/merge_repo/RLinf_RoboTwin/":$PYTHONPATH
+export PYTHONPATH=${REPO_PATH}:$PYTHONPATH
 # NOTE: set LIBERO_REPO_PATH to the path of the LIBERO repo
 export LIBERO_REPO_PATH="/path/to/repo/LIBERO"
 # NOTE: set LIBERO_CONFIG_PATH for libero/libero/__init__.py
