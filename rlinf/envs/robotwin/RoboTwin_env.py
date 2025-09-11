@@ -1,6 +1,5 @@
 import importlib
 import os
-
 from multiprocessing import Array, Event, Semaphore, Value
 
 import cv2
