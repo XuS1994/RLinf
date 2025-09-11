@@ -1,36 +1,24 @@
 import importlib
 import os
-import sys
 
-import cv2
-import torch
-import yaml
-
-# TODO: envs is referenced from RoboTwin repo, need to be modified
-from envs import *
-
-sys.path.append('./')
-sys.path.append('./policy/RDT/')
 from multiprocessing import Array, Event, Semaphore, Value
 
+import cv2
+import envs  # robotwin.envs
 import gymnasium as gym
 import numpy as np
+import torch
 import torch.multiprocessing as mp
+import yaml
 from omegaconf.omegaconf import OmegaConf
 
 '''
-输入值:
+Input values:
 actions[step,14]
-完整返回值:
+Complete return values:
 images[step,3,3,480,640]
 states[step,action_dim]
 '''
-
-DEBUG = True
-
-def Debug_print(process_id, msg):
-    if DEBUG:
-        print(f"[process {process_id}] {msg}")
 
 def class_decorator(task_name):
     envs_module = importlib.import_module(f'envs.{task_name}')
@@ -79,15 +67,14 @@ def worker(
                 seed_id.value += 1
                 if seed_id.value >= 30:
                     seed_id.value %= 30
-            print(process_id, f"now_seed: {now_seed}")
             task.setup_demo(now_ep_num = now_seed, seed = now_seed, ** args)
             valid_seed = True
         except Exception as e:
             print(f"Error in process {process_id} during setup_demo with seed {now_seed}: {e}")
 
-    # 初始化成功后需要返回初始场景
+    # After successful initialization, need to return initial scene
     action_input_sem.acquire()
-    task.run_steps = 0 #用于记录当前运行到第几步, 大于每一次环境的最大执行部步数就结束, shoe_place中是450步
+    task.run_steps = 0 # Used to record current step, ends when greater than max steps per environment (450 steps in shoe_place)
     prev_obs_venv = task.get_obs()
     return_pose = np.array([task.get_return_pose()])
     return_pose = filling_up(return_pose)
@@ -98,22 +85,15 @@ def worker(
     state_return = np.array(state_return)
 
     result = np.concatenate([image_return.flatten(), state_return.flatten(), np.array([0]), np.array([0]), np.array([0]), return_pose.flatten()])
-    print(process_id, "task init success!")
-    print(f"image_return.shape {image_return.shape}")
-    print(f"state_return.shape {state_return.shape}")
-    print(f"return_pose.shape {return_pose.shape}")
-    print(f"len(result) {len(result)}")
-    print(f"len(results) {len(results)}")
-    print(RESULT_SIZE)
     results[RESULT_SIZE*process_id:(process_id+1)*RESULT_SIZE] = result
     result_output_sem.release()
 
     while True:
-        # 接收到action_input_event信号量,表示要actions更新了
+        # Receive action_input_event semaphore, indicating actions need to be updated
         action_input_sem.acquire()
-        # print(process_id, f"read from shared buffer")
         numpy_actions = np.frombuffer(actions.get_obj()).reshape(NUM_PROCESSES, HORIZON, ACTION_DIM)
         input_actions = numpy_actions[process_id]
+
 
         if reset_event.is_set():
             valid_seed = False
@@ -125,13 +105,12 @@ def worker(
                         seed_id.value += 1
                         if seed_id.value >= 30:
                             seed_id.value %= 30
-                    print(process_id, f"now_seed: {now_seed}")
                     task.setup_demo(now_ep_num = now_seed, seed = now_seed, ** args)
                     valid_seed = True
                 except Exception as e:
                     print(f"Error in process {process_id} during setup_demo with seed {now_seed}: {e}")
-            task.run_steps = 0 #用于记录当前运行到第几步, 大于每一次环境的最大执行部步数就结束, shoe_place中是450步
-            task.reward_step = 0 # 对应获取reward阶段
+            task.run_steps = 0 # Used to record current step, ends when greater than max steps per environment (450 steps in shoe_place)
+            task.reward_step = 0 # Corresponds to reward acquisition phase
             envs_finish = False
             prev_obs_venv = task.get_obs()
             prev_obs_venv = [prev_obs_venv]
@@ -148,7 +127,6 @@ def worker(
             results[RESULT_SIZE*process_id:RESULT_SIZE*(process_id+1)] = result
             result_output_sem.release()
 
-            print(process_id, "reset success!")
             continue
 
         '''
@@ -156,23 +134,20 @@ def worker(
         reward_venv,
         terminated_venv,
         truncated_venv,
-        info_venv,#暂时没用, 不返回, 后续可以补充
+        info_venv,
         '''
         obs_venv,reward_venv, terminated_venv, _, return_poses = task.gen_dense_reward_once(input_actions)
-        # print(process_id, f"step once success!")
         # TODO something return_poses is [1,6], sometimes is [2,6]
         return_poses = return_poses[0:1,:]
         return_poses = filling_up(return_poses)
-        if len(obs_venv) > 1: #表示没有运行结束/成功
+        if len(obs_venv) > 1: # Indicates not finished/successful
             image_return = update_obs(obs_venv[-2])[0] + update_obs(obs_venv[-1])[0]
             state_return = update_obs(obs_venv[-1])[1]
-        # 按顺序编码
-        # 判断是否要进行新的环境了
+        # Encode in order
+        # Check if need to start new environment
         if terminated_venv[0] == 1:
             envs_finish = True
-            print(process_id, "task terminated!")
 
-        # print(task.run_steps, now_seed)
         if envs_finish:
             valid_seed = False
 
@@ -183,13 +158,12 @@ def worker(
                         seed_id.value += 1
                         if seed_id.value >= 30:
                             seed_id.value %= 30
-                    print(process_id, f"now_seed: {now_seed}")
                     task.setup_demo(now_ep_num = now_seed, seed = now_seed, ** args)
                     valid_seed = True
                 except Exception as e:
                     print(f"Error in process {process_id} during setup_demo with seed {now_seed}: {e}")
-            task.run_steps = 0 #用于记录当前运行到第几步, 大于每一次环境的最大执行部步数就结束, shoe_place中是450步
-            task.reward_step = 0 # 对应获取reward阶段
+            task.run_steps = 0 # Used to record current step, ends when greater than max steps per environment (450 steps in shoe_place)
+            task.reward_step = 0 # Corresponds to reward acquisition phase
             envs_finish = False
             prev_obs_venv = task.get_obs()
             prev_obs_venv = [prev_obs_venv]
@@ -203,13 +177,6 @@ def worker(
         state_return = np.array(state_return)
 
         result = np.concatenate([image_return.flatten(), state_return.flatten(), reward_venv.flatten(),terminated_venv.flatten(), np.array([0]), return_poses.flatten()])
-        print(process_id, "task final success!")
-        print(f"image_return.shape {image_return.shape}")
-        print(f"state_return.shape {state_return.shape}")
-        print(f"return_pose.shape {return_poses.shape}")
-        print(f"len(result) {len(result)}")
-        print(f"len(results) {len(results)}")
-        print(RESULT_SIZE)
         results[RESULT_SIZE*process_id:RESULT_SIZE*(process_id+1)] = result
         result_output_sem.release()
 
@@ -223,7 +190,7 @@ def update_obs(observation):
 
 class RoboTwin(gym.Env):
     def __init__(self, cfg, rank, world_size, record_metrics=True):
-        # 从配置中获取参数
+        # Get parameters from configuration
         self.cfg = cfg
         self.rank = rank
         self.world_size = world_size
@@ -238,20 +205,20 @@ class RoboTwin(gym.Env):
         self.n_envs = self.num_envs
         self.horizon = getattr(cfg, 'horizon', 1)
         self.action_dim = 14
-        self.root_path = "/mnt/public/xusi/merge_repo/RLinf_RoboTwin/"
-        self.configs_path = "/mnt/public/xusi/merge_repo/RLinf_RoboTwin/task_config/"
+        self.root_path = envs.__file__.split('envs')[0]
         head_camera_type = 'D435'
         seed = 1
         rdt_step = 10
+        self.image_size = self.cfg.image_size
         with open(os.path.join(self.root_path, f'task_config/{self.task_name}.yml'), 'r', encoding='utf-8') as f:
             args = yaml.load(f.read(), Loader=yaml.FullLoader)
         embodiment_type = args.get('embodiment')
-        embodiment_config_path = os.path.join(self.configs_path, '_embodiment_config.yml')
+        embodiment_config_path = os.path.join(self.root_path, 'task_config/_embodiment_config.yml')
 
         with open(embodiment_config_path, 'r', encoding='utf-8') as f:
             _embodiment_types = yaml.load(f.read(), Loader=yaml.FullLoader)
 
-        with open(self.configs_path + '_camera_config.yml', 'r', encoding='utf-8') as f:
+        with open(self.root_path + 'task_config/_camera_config.yml', 'r', encoding='utf-8') as f:
             _camera_config = yaml.load(f.read(), Loader=yaml.FullLoader)
 
         args['head_camera_h'] = _camera_config[head_camera_type]['h']
@@ -288,15 +255,6 @@ class RoboTwin(gym.Env):
         else:
             embodiment_name = str(embodiment_type[0]) + '_' + str(embodiment_type[1])
 
-        # output camera config
-        # print('============= Config =============\n')
-        # print('Messy Table: ' + str(args['messy_table']))
-        # print('Random Texture: ' + str(args['random_texture']))
-        # print('Head Camera Config: '+ str(args['head_camera_type']) + f',' + str(args['collect_head_camera']))
-        # print('Wrist Camera Config: '+ str(args['wrist_camera_type']) + f',' + str(args['collect_wrist_camera']))
-        # print('Embodiment Config:: '+ str(args['embodiment']))
-        # print('\n=======================================')
-
         args['embodiment_name'] = embodiment_name
         args['expert_seed'] = seed
 
@@ -309,20 +267,20 @@ class RoboTwin(gym.Env):
         args['action_dim'] = 14
 
         self.NUM_IMAGES = 6
-        self.IMAGE_SHAPE = (240, 320, 3)  # 每张图像的形状
-        self.STATE_SHAPE = (1, 14)  # 状态向量的形状
-        self.TARGET_SHAPE = (self.horizon, 6)  # 目标物体的xyz + 目标位置xyz
+        self.IMAGE_SHAPE = (240, 320, 3)  # Shape of each image
+        self.STATE_SHAPE = (1, 14)  # Shape of state vector
+        self.TARGET_SHAPE = (self.horizon, 6)  # Target object xyz + target position xyz
 
-        self.IMAGE_SIZE = np.prod(self.IMAGE_SHAPE)  # 每张图像的大小
-        self.STATE_SIZE = np.prod(self.STATE_SHAPE)  # 状态向量的大小
-        self.TARGET_SIZE = np.prod(self.TARGET_SHAPE) # 目标向量的大小
+        self.IMAGE_SIZE = np.prod(self.IMAGE_SHAPE)  # Size of each image
+        self.STATE_SIZE = np.prod(self.STATE_SHAPE)  # Size of state vector
+        self.TARGET_SIZE = np.prod(self.TARGET_SHAPE) # Size of target vector
 
-        args['result_size'] = int(self.NUM_IMAGES * self.IMAGE_SIZE + self.STATE_SIZE + 3 + self.TARGET_SIZE)  # 输出大小
-        args['input_size'] = int(self.horizon*14)   # 输入大小
+        args['result_size'] = int(self.NUM_IMAGES * self.IMAGE_SIZE + self.STATE_SIZE + 3 + self.TARGET_SIZE)  # Output size
+        args['input_size'] = int(self.horizon*14)   # Input size
 
         self.args = args
-        # 多进程的线程数
-        self.n_envs = self.num_envs
+        self.auto_reset  = False
+        self.use_rel_reward = False
 
         self.process = []
 
@@ -342,7 +300,7 @@ class RoboTwin(gym.Env):
 
     @property
     def device(self):
-        return "cpu"  # RoboTwin使用CPU
+        return "cpu"  # RoboTwin uses CPU
 
     @property
     def elapsed_steps(self):
@@ -432,12 +390,11 @@ class RoboTwin(gym.Env):
         infos["episode"] = episode_info
         return infos
 
-    # 初始化成功后需要返回初始场景
+    # After successful initialization, need to return initial scene
     def init_process(self):
         self.context = mp.get_context("spawn")
         self.input_sem = self.context.Semaphore(0)
         self.output_sem = self.context.Semaphore(0)
-        # reset()使用信号控制
         self.reset_event = self.context.Event()
 
         self.share_seed = self.context.Value('i', self.seed)
@@ -465,14 +422,13 @@ class RoboTwin(gym.Env):
     def step(self, actions = None):
         if actions is None:
             actions = np.zeros((self.n_envs, self.horizon, self.action_dim))
-        print(f"actions.shape: {actions.shape}")
         self.share_actions[:] = actions.flatten()
 
-        # 释放信号量, 表示actions更新了
+        # Release semaphore, indicating actions have been updated
         for i in range(self.n_envs):
             self.input_sem.release()
 
-        # 等待所有envs都完成了输出
+        # Wait for all envs to complete output
         for i in range(self.n_envs):
             self.output_sem.acquire()
 
@@ -483,105 +439,25 @@ class RoboTwin(gym.Env):
 
     def reset(self):
         self.reset_event.set()
-        # 释放信号量, 表示actions更新了
+        # Release semaphore, indicating actions have been updated
         for i in range(self.n_envs):
             self.input_sem.release()
 
-        # 等待所有envs都完成了输出
+        # Wait for all envs to complete output
         for i in range(self.n_envs):
             self.output_sem.acquire()
 
         self.reset_event.clear()
         return
 
-    # def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
-    #     """Reset the environment and return initial observation and info."""
-    #     if options is None:
-    #         options = {}
-
-    #     # 如果这是第一次调用或需要初始化进程
-    #     if self.input_sem is None:
-    #         obs_venv, reward_venv, terminated_venv, truncated_venv, info_venv = self.init_process()
-    #         self._is_start = False
-    #         self._elapsed_steps = 0
-    #         # 返回第一个环境的观察
-    #         return obs_venv[0], {"return_poses": info_venv[0]}
-
-    #     # 常规重置
-    #     self.reset_event.set()
-    #     # 释放信号量, 表示actions更新了
-    #     for i in range(self.n_envs):
-    #         self.input_sem.release()
-
-    #     # 等待所有envs都完成了输出
-    #     for i in range(self.n_envs):
-    #         self.output_sem.acquire()
-
-    #     self.reset_event.clear()
-    #     self._elapsed_steps = 0
-
-    #     # 获取重置后的观察
-    #     results = np.frombuffer(self.share_results.get_obj()).reshape(self.n_envs, self.args['result_size'])
-    #     results = self.de_initialize_result(results)
-    #     obs_venv, reward_venv, terminated_venv, truncated_venv, info_venv = self.transform(results)
-
-    #     # 返回第一个环境的观察
-    #     return obs_venv[0], {"return_poses": info_venv[0]}
-
-    # def step(self, actions):
-    #     """Execute actions and return observation, reward, terminated, truncated, info."""
-    #     if self.is_start:
-    #         # 如果是第一次调用，先重置环境
-    #         obs, info = self.reset()
-    #         self._is_start = False
-    #         terminated = np.zeros(self.num_envs, dtype=bool)
-    #         truncated = np.zeros(self.num_envs, dtype=bool)
-    #         reward = np.zeros(self.num_envs, dtype=np.float32)
-    #         return obs, reward[0], terminated[0], truncated[0], info
-
-    #     # 确保actions是正确的形状
-    #     if len(actions.shape) == 2:
-    #         actions = actions[np.newaxis, :]  # 添加batch维度
-    #     elif len(actions.shape) == 1:
-    #         actions = actions.reshape(1, self.horizon, -1)
-
-    #     self.share_actions[:] = actions.flatten()
-
-    #     # 释放信号量, 表示actions更新了
-    #     for i in range(self.n_envs):
-    #         self.input_sem.release()
-
-    #     # 等待所有envs都完成了输出
-    #     for i in range(self.n_envs):
-    #         self.output_sem.acquire()
-
-    #     results = np.frombuffer(self.share_results.get_obj()).reshape(self.n_envs, self.args['result_size'])
-    #     results = self.de_initialize_result(results)
-    #     obs_venv, reward_venv, terminated_venv, truncated_venv, info_venv = self.transform(results)
-
-    #     self._elapsed_steps += 1
-
-    #     # 检查是否达到最大步数
-    #     truncated_venv = [t or (self._elapsed_steps >= self.max_steps) for t in truncated_venv]
-
-    #     # 返回第一个环境的结果
-    #     return (obs_venv[0],
-    #             reward_venv[0],
-    #             terminated_venv[0],
-    #             truncated_venv[0],
-    #             {"return_poses": info_venv[0]})
-
     def transform(self, results):
         # TODO resize image to 224x224
-        size = (224,224)
         def jpeg_mapping(img):
             if img is None:
                 return None
             img = cv2.imencode('.jpg', img)[1].tobytes()
             img = cv2.imdecode(np.frombuffer(img, np.uint8), cv2.IMREAD_COLOR)
             return img
-        def resize_img(img,size):
-            return cv2.resize(img, size)
         obs_venv = {"images": [], "state": [], "task_descriptions": []}
         reward_venv = torch.zeros(
                 self.num_envs, dtype=torch.float32, device=self.device
@@ -592,24 +468,23 @@ class RoboTwin(gym.Env):
         truncated_venv = torch.zeros(
                 self.num_envs, dtype=torch.bool, device=self.device
             )
-        info_venv = []
+        info_venv = {"return_poses": []}
         for i in range(self.n_envs):
             result = results[i]
             imgs = result['imgs']
-            imgs = [resize_img(img,size) for img in imgs]
+            imgs = [cv2.resize(img, self.image_size) for img in imgs]
             imgs = [jpeg_mapping(img) for img in imgs]
             imgs = np.array(imgs)
 
             # TODO output is 6 3 224 224, we just use first images
-            obs_venv["images"].append(torch.from_numpy(imgs).to(self.device)[0])
+            obs_venv["images"].append(torch.from_numpy(imgs).to(self.device))
             obs_venv["state"].append(torch.from_numpy(result['state']).to(self.device))
             obs_venv["task_descriptions"].append("")
             reward_venv[i] = torch.from_numpy(result['reward']).to(self.device)
             terminated_venv[i] = torch.from_numpy(result['terminated']).to(self.device)
             truncated_venv[i] = torch.from_numpy(result['truncated']).to(self.device)
-            info_venv.append(result['return_poses'])
-            print(f"state: {result['state']} and result keys: {result.keys()}")
-        obs_venv["images"] = torch.stack(obs_venv["images"]).permute(0,3,1,2)
+            info_venv["return_poses"].append(torch.from_numpy(result['return_poses']).to(self.device))
+        obs_venv["images"] = torch.stack(obs_venv["images"]).permute(0,1,4,2,3)
         obs_venv["state"] = torch.stack(obs_venv["state"])
         return obs_venv, reward_venv, terminated_venv, truncated_venv, info_venv
 
@@ -621,8 +496,6 @@ class RoboTwin(gym.Env):
         raw_chunk_truncations = []
         for i in range(chunk_size):
             actions = chunk_actions[:, i]
-            print(f"chunk_actions: {chunk_actions.shape}")
-            print(f"actions: {actions.shape}")
             extracted_obs, step_reward, terminations, truncations, infos = self.step(
                 actions
             )
@@ -683,19 +556,18 @@ class RoboTwin(gym.Env):
         return conds
 
     def clear(self):
-        # 结束所有的当前进程
+        # End all current processes
         for i in range(self.n_envs):
             if self.process[i].is_alive():
                 self.process[i].terminate()
-                # 等待进程完全结束
+                # Wait for process to completely end
                 self.process[i].join()
-                # 释放占用内存
+                # Release occupied memory
                 self.process[i].close()
         self.seed = self.share_seed.value
         if self.seed > 3000:
             self.seed = 0
         self.process = []
-        print("main", "clear all processes success!")
 
 if __name__ == "__main__":
     mp.set_start_method("spawn")  # solve CUDA compatibility problem
@@ -713,8 +585,6 @@ if __name__ == "__main__":
             actions += np.random.randn(n_envs, horizon, action_dim)*0.05
             actions = np.clip(actions,0, 1)
             obs_venv, reward_venv, terminated_venv, truncated_venv, info_venv = robotwin.step(actions)
-            print("main", f"step: {step}")
-            print("main", f"reward_venv: {reward_venv}")
 
             if step%10 == 0:
                 robotwin.reset()
@@ -722,5 +592,5 @@ if __name__ == "__main__":
                 print("main", f"terminated_venv: {terminated_venv}")
             if truncated_venv[0] == 1:
                 print("main", f"truncated_venv: {truncated_venv}")
-            # print("main", f"info_venv: {info_venv}")
+            print("main", f"info_venv: {info_venv}")
         robotwin.clear()

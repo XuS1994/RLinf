@@ -76,6 +76,7 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         input_embeddings = input_embeddings * (~all_actions_mask.unsqueeze(-1))
 
         # vision
+        pixel_values = pixel_values.reshape(-1, *pixel_values.shape[2:])
         projected_patch_embeddings = self._process_vision_features(
             pixel_values, None, use_film=False
         )
@@ -83,6 +84,7 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         assert projected_patch_embeddings.shape[1] == n_patch_tokens
 
         # multimodal embeddings
+        projected_patch_embeddings = projected_patch_embeddings.reshape(input_embeddings.shape[0], -1, projected_patch_embeddings.shape[-1])
         multimodal_embeddings, multimodal_attention_mask = (
             self._build_multimodal_attention(
                 input_embeddings, projected_patch_embeddings, attention_mask

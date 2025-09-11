@@ -87,7 +87,7 @@ def prepare_actions(
             action_scale=action_scale,
             policy=policy,
         )
-    elif simulator_type == "RoboTwin":
+    elif simulator_type == "robotwin":
         chunk_actions = raw_chunk_actions
     else:
         raise NotImplementedError
