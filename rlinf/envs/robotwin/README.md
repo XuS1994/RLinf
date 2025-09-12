@@ -4,48 +4,16 @@ This guide provides step-by-step instructions for setting up the RoboTwin enviro
 
 ## Installation Steps
 
-### 1. Install Required Dependencies
-
-Install the necessary Python packages:
-
-```bash
-pip install open3d
-pip install joblib
-pip install warp-lang
-pip install yourdfpy
-pip install mplib==0.2.1
-```
-
-### 2. Clone Required Repositories
+### 1. Clone Required Repositories
 
 Clone the necessary third-party repositories:
 
 ```bash
-# Clone CuRobo repository
-git clone https://github.com/NVlabs/curobo.git third_party/curobo
-
 # Clone RoboTwin repository
 git clone https://github.com/RoboTwin-Platform/RoboTwin.git third_party/robtowin
 ```
 
-### 3. Copy CuRobo Source Files
-
-Copy the CuRobo source files to the robotwin directory:
-
-```bash
-cp -r third_party/curobo/src/curobo/ third_party/robotwin/
-```
-
-### 4. Set Environment Variables
-
-Add the robotwin directory to your Python path:
-
-```bash
-export PYTHONPATH="/mnt/public/xusi/third_party/robotwin":$PYTHONPATH
-```
-
-
-### 5. Download Assets
+### 2. Download Assets
 
 Download the required assets for the environment. The specific download process depends on your setup requirements.
 
@@ -54,7 +22,17 @@ cd third_party/robotwin/assets
 bash _download.py
 ```
 
-### 6. Configure Asset Paths
+### 3. Build and Set Environment Variables
+
+Add the robotwin directory to your Python path:
+
+```bash
+cd third_party/robtowin
+bash script/_install.sh
+export PYTHONPATH="/mnt/public/xusi/third_party/robotwin":$PYTHONPATH
+```
+
+### 4. Configure Asset Paths (Auto completed, refer to script/_install.sh)
 
 Update the configuration files with the correct paths to your assets:
 
@@ -71,7 +49,6 @@ collision_spheres: path/to/assets/embodiments/aloha-agilex/collision_aloha_left.
 urdf_path: path/to/assets/embodiments/aloha-agilex/urdf/arx5_description_isaac.urdf
 collision_spheres: path/to/assets/embodiments/aloha-agilex/collision_aloha_right.yml
 ```
-
 
 ## Run the environment tests
 
