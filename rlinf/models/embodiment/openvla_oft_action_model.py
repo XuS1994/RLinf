@@ -84,7 +84,9 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         assert projected_patch_embeddings.shape[1] == n_patch_tokens
 
         # multimodal embeddings
-        projected_patch_embeddings = projected_patch_embeddings.reshape(input_embeddings.shape[0], -1, projected_patch_embeddings.shape[2:])
+        projected_patch_embeddings = projected_patch_embeddings.reshape(
+            input_embeddings.shape[0], -1, projected_patch_embeddings.shape[2:]
+        )
         multimodal_embeddings, multimodal_attention_mask = (
             self._build_multimodal_attention(
                 input_embeddings, projected_patch_embeddings, attention_mask
@@ -110,18 +112,28 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         """Prepares input for action prediction by adding necessary tokens"""
         # Add (ACTION_DIM * NUM_ACTIONS_CHUNK) placeholder tokens to input_ids to simulate action tokens
         placeholder_action_token_ids = (
-            torch.ones((input_ids.shape[0], self.action_dim * self.num_action_chunks)).to(input_ids.device).to(input_ids.dtype)
+            torch.ones((input_ids.shape[0], self.action_dim * self.num_action_chunks))
+            .to(input_ids.device)
+            .to(input_ids.dtype)
         )
         input_ids = torch.cat([input_ids, placeholder_action_token_ids], dim=-1)
 
         # Add stop token to sequence (needed in non-causal bi-directional self-attention, as it appears at train time)
-        stop_token_id = torch.ones((input_ids.shape[0], 1)).to(input_ids.device).to(input_ids.dtype) * STOP_INDEX
+        stop_token_id = (
+            torch.ones((input_ids.shape[0], 1)).to(input_ids.device).to(input_ids.dtype)
+            * STOP_INDEX
+        )
         input_ids = torch.cat([input_ids, stop_token_id], dim=-1)
 
         # Extend the attention mask to fit the new shape of input
         # Note: Only batch size == 1 supported right now
         mask_extension = (
-            torch.ones((attention_mask.shape[0], input_ids.shape[-1] - attention_mask.shape[-1]))
+            torch.ones(
+                (
+                    attention_mask.shape[0],
+                    input_ids.shape[-1] - attention_mask.shape[-1],
+                )
+            )
             .to(attention_mask.device)
             .to(attention_mask.dtype)
         )

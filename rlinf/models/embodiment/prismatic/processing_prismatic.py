@@ -61,7 +61,9 @@ class PrismaticImageProcessor(PrismaticImageProcessorOrginal):
 
         # [Contract] `imgs_t` is a list of Tensors of shape [B, num_images, C, H, W]; stack along dim C
         img_t = torch.cat(imgs_t, dim=1)
-        img_t = img_t.reshape(batch_size, -1, *img_t.shape[1:])  # [B, num_images, C * n, H, W]
+        img_t = img_t.reshape(
+            batch_size, -1, *img_t.shape[1:]
+        )  # [B, num_images, C * n, H, W]
 
         return img_t
 

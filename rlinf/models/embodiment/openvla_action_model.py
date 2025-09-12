@@ -176,7 +176,9 @@ class OpenVLAForBatchActionPrediction(OpenVLAForActionPrediction):
 
             # Projection Logic =>> Update Attention Mask
             projected_patch_embeddings = self.projector(patch_features)
-            projected_patch_embeddings = projected_patch_embeddings.reshape(input_ids.shape[0], -1, *projected_patch_embeddings.shape[2:])
+            projected_patch_embeddings = projected_patch_embeddings.reshape(
+                input_ids.shape[0], -1, *projected_patch_embeddings.shape[2:]
+            )
 
             projected_patch_attention_mask = None
             if attention_mask is not None:

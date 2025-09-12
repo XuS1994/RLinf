@@ -169,7 +169,9 @@ class EnvWorker(Worker):
                         )
                     )
         else:
-            raise NotImplementedError(f"Simulator type {self.cfg.env.train.simulator_type} not implemented")
+            raise NotImplementedError(
+                f"Simulator type {self.cfg.env.train.simulator_type} not implemented"
+            )
 
         if not only_eval:
             self._init_simulator()
