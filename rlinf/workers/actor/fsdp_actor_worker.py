@@ -258,6 +258,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
         return rollout_metrics
 
     def run_training(self):
+        # breakpoint()
         if self.cfg.actor.get("enable_offload", False):
             self.load_fsdp_param_and_grad(self.device)
             self.load_fsdp_optimizer(self.device)
@@ -340,10 +341,11 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
                         denoise_inds = torch.randint(0, self.cfg.actor.model.num_steps, (data_size,))
                         data["denoise_inds"] = denoise_inds # TODO: add mix mode
                         data["prev_logprobs"] = data["prev_logprobs"][torch.arange(data_size), denoise_inds]
-                        # METHOD1
                         output_dict = self.model(data, mode="compute_logprob")
-                        # METHOD2
-                        # output_dict = self.model._forward_micro_batch(data)
+                    elif self.cfg.actor.model.model_name == "openpi":
+                        # ode-sde mix mode
+                        data['prev_logprobs'] = data['prev_logprobs'][torch.arange(data["prev_logprobs"].shape[0]), data["denoise_inds"]]
+                        output_dict = self.model(data, mode="compute_logprob")
                     else:
                         input_ids = data["input_ids"]
                         action_tokens = data["action_tokens"]
@@ -444,7 +446,6 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
         torch.cuda.synchronize()
         torch.distributed.barrier()
         torch.cuda.empty_cache()
-
         return mean_metric_dict
 
     def save_checkpoint(self, save_base_path, step):

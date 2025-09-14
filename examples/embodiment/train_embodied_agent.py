@@ -58,7 +58,6 @@ def main(cfg) -> None:
         rollout=rollout_group,
         env=env_group,
     )
-
     runner.init_workers()
     runner.run()
 

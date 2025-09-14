@@ -35,7 +35,7 @@ def should_wrap(module):
     # return False
     # TODO: zhihao: add PaliGemmaForConditionalGeneration to the should_wrap function
     # TODO cannot import name 'PaliGemmaForConditionalGeneration' from 'transformers' in transformers 4.40.1
-    # return True
+    return True
     from transformers import PaliGemmaForConditionalGeneration
     from transformers.models.gemma.modeling_gemma import GemmaDecoderLayer
     from lerobot.common.policies.normalize import Normalize, Unnormalize
@@ -97,9 +97,10 @@ class FSDPModelManager:
     def setup_model_and_optimizer(self):
         """Setup model and optimizer."""
         module = self.model_provider_func()
-
-        if hasattr(module, 'gradient_checkpointing_enable'):
-            module.gradient_checkpointing_enable()
+        
+        # TODO: openpi fsdp not compatibale with gradient checkpointing
+        # if hasattr(module, 'gradient_checkpointing_enable'):
+        #     module.gradient_checkpointing_enable()
 
         mixed_precision = MixedPrecision(
             param_dtype=self.torch_dtype,
@@ -120,9 +121,13 @@ class FSDPModelManager:
         #     auto_wrap_policy = None
 
         # TODO: zhihao: change to no_shard
+        # breakpoint()
+        
         sharding_strategy = ShardingStrategy.NO_SHARD
-        auto_wrap_policy = functools.partial(lambda_auto_wrap_policy, lambda_fn=should_wrap)
-
+        if self._cfg.model.model_name == "openpi":
+            auto_wrap_policy = get_fsdp_wrap_policy(module=module, config=None, is_lora=self._cfg.model.is_lora)
+        elif self._cfg.model.model_name == "pi0":
+            auto_wrap_policy = functools.partial(lambda_auto_wrap_policy, lambda_fn=should_wrap)
         betas = (self._cfg.optim.adam_beta1, self._cfg.optim.adam_beta2)
         self.model = FSDP(
             module,

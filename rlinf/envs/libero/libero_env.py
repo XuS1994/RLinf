@@ -126,7 +126,7 @@ class LiberoEnv(gym.Env):
     def update_reset_state_ids(self):
         if self.cfg.only_eval:
             # TODO : zhihao : group_size * num_group_envs / env_process_num
-            reset_state_ids = self._get_ordered_reset_state_ids(50) 
+            reset_state_ids = self._get_ordered_reset_state_ids(62) 
             self.reset_state_ids = reset_state_ids.clip(0,499)
         else:
             reset_state_ids = self._get_random_reset_state_ids(self.num_group)
@@ -140,7 +140,7 @@ class LiberoEnv(gym.Env):
     def _get_random_reset_state_ids(self, num_reset_states):
         # TODO: zhihao: mix task ids and trial ids
         reset_state_ids = self._generator.integers(
-            low=0, high=400, size=(num_reset_states,)
+            low=0, high=500, size=(num_reset_states,)
         )
         # reset_state_ids = self._generator.integers(
         #     low=50 * self.rank, high= 50 * (self.rank + 1), size=(num_reset_states, )

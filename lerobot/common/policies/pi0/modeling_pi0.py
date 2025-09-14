@@ -472,10 +472,17 @@ class PI0FlowMatching(nn.Module):
             params.requires_grad = self.config.train_state_proj
 
     def sample_noise(self, shape, device):
-        noise = torch.normal(
-            mean=0.0,
-            std=1.0,
+        # TODO: zhihao : fix the noise to construct the same output
+        # noise = torch.normal(
+        #     mean=0.0,
+        #     std=1.0,
+        #     size=shape,
+        #     dtype=torch.float32,
+        #     device=device,
+        # )
+        noise = torch.full(
             size=shape,
+            fill_value=0.1,
             dtype=torch.float32,
             device=device,
         )

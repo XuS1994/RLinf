@@ -182,7 +182,6 @@ def calculate_advantages_and_returns(
         from rlinf.algorithms.embodiment.grpo_functions import (
             compute_advantages_with_loss_mask,
         )
-        # breakpoint()
         advantages = compute_advantages_with_loss_mask(
             rewards=rewards,
             dones=dones,

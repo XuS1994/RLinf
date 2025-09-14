@@ -101,6 +101,10 @@ def get_model_config_and_processor(cfg: DictConfig):
         # Pi0 doesn't use traditional tokenizer/image processor
         # It handles preprocessing internally
         input_processor = None
+    elif cfg.model.model_name == "openpi":
+        # TODO: model_config not used?
+        model_config = None
+        input_processor = None
 
     return model_config, input_processor
 
@@ -200,6 +204,65 @@ def get_model(model_path, cfg: DictConfig, override_config_kwargs=None):
         model = make_policy(actor_model_config, policy_class=Pi0ForRLActionPrediction, ds_meta=dataset_meta)
         # TODO: solve fsdp bug
         model.model.paligemma_with_expert.replace_gemma_decoder_layer() 
+    elif cfg.model_name == "openpi":
+        # breakpoint()
+        from .embodiment.openpi_action_model import OpenPi0ForRLActionPrediction
+        from openpi.training import config as _config
+        import openpi.models.model as _model
+        import openpi.policies.policy as _policy
+        import openpi.shared.download as download
+        from openpi.training import checkpoints as _checkpoints
+        from openpi.training import config as _config
+        import openpi.transforms as transforms
+        import safetensors
+        # TODO: Only unlock the expert-related parameters
+        # TODO: add replace operation on the config by cfg
+        # config 
+        actor_train_config = _config.get_config("pi0_libero") 
+        actor_model_config = actor_train_config.model
+        override_config_kwargs = cfg.openpi
+        if override_config_kwargs is not None:
+            for key, val in override_config_kwargs.items():
+                actor_model_config.__dict__[key] = val
+        # load model
+        checkpoint_dir = download.maybe_download(str(model_path))
+        weight_path = os.path.join(checkpoint_dir, "model.safetensors")
+        model:OpenPi0ForRLActionPrediction = OpenPi0ForRLActionPrediction(actor_model_config)
+        # train expert only
+        if actor_model_config.train_expert_only:
+            model.freeze_vlm()
+        safetensors.torch.load_model(model, weight_path)
+        model.paligemma_with_expert.to_bfloat16_for_selected_params("bfloat16")
+        # fsdp replace 
+        # model.paligemma_with_expert.replace_gemma_decoder_layers()
+        # load data stats
+        data_config = actor_train_config.data.create(actor_train_config.assets_dirs, actor_model_config)
+        norm_stats = None
+        if norm_stats is None:
+            # We are loading the norm stats from the checkpoint instead of the config assets dir to make sure
+            # that the policy is using the same normalization stats as the original training process.
+            if data_config.asset_id is None:
+                raise ValueError("Asset id is required to load norm stats.")
+            norm_stats = _checkpoints.load_norm_stats(checkpoint_dir, data_config.asset_id)
+        # wrappers
+        repack_transforms = transforms.Group()
+        default_prompt = None
+        model.setup_wrappers(
+            transforms=[
+            *repack_transforms.inputs,
+            transforms.InjectDefaultPrompt(default_prompt),
+            *data_config.data_transforms.inputs,
+            transforms.Normalize(norm_stats, use_quantiles=data_config.use_quantile_norm),
+            *data_config.model_transforms.inputs,
+        ],
+            output_transforms=[
+                *data_config.model_transforms.outputs,
+                transforms.Unnormalize(norm_stats, use_quantiles=data_config.use_quantile_norm),
+                *data_config.data_transforms.outputs,
+                *repack_transforms.outputs,
+            ],
+        )
+        
     else:
         return None
     if torch.cuda.is_available():

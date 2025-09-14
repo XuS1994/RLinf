@@ -3,8 +3,8 @@ export EMBODIED_PATH="$( cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export REPO_PATH=$(dirname $(dirname "$EMBODIED_PATH"))
 export SRC_FILE="${EMBODIED_PATH}/train_embodied_agent.py"
 
-export MUJOCO_GL="osmesa"
-export PYOPENGL_PLATFORM="osmesa"
+# export MUJOCO_GL="osmesa"
+# export PYOPENGL_PLATFORM="osmesa"
 export PYTHONPATH=${REPO_PATH}:$PYTHONPATH
 # NOTE: set LIBERO_REPO_PATH to the path of the LIBERO repo
 export LIBERO_REPO_PATH="/workspace/libero"

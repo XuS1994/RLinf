@@ -39,7 +39,6 @@ runner:
   max_prompt_length: 50
 
 algorithm:
-  update_epoch: 3
   auto_reset: False
   ignore_terminations: False
   use_fixed_reset_state_ids: True
@@ -52,17 +51,16 @@ algorithm:
   n_eval_chunk_steps: 48
   # training generation mbs
   rollout_micro_batch_size: 64
-  num_group_envs: 16  # TODO: large rollout bsz (= group_size*num_group_envs) will cause OOM
-  rollout_epoch: 4
-
+  num_group_envs: 8
+  rollout_epoch: 8
   reward_type: chunk_level
-  logprob_type: "chunk_level" # TODO: zhihao : check these three type settings 
+  logprob_type: "chunk_level"
   entropy_type: "token_level"
 
   # mbs to do log prob inference, can be set to
   # lower than rollout_micro_batch_size to reduce
   # memory usage
-  logprob_forward_micro_batch_size: 16 # ${.rollout_micro_batch_size}
+  logprob_forward_micro_batch_size: 16
   adv_type: "grpo"
   loss_type: "grpo" # specifically for pi0
   loss_agg_func: "token-mean" 
@@ -75,6 +73,9 @@ algorithm:
   gamma: 0.99
   gae_lambda: 0.95
   use_norm_adv: True
+  filter_rewards: True
+  rewards_lower_bound: 0.1
+  rewards_upper_bound: 0.9
   # params for generation
   sampling_params:
     use_greedy: False
@@ -108,7 +109,7 @@ rollout:
     queue_size: 0
   mode: "colocate"
   generation_backend: "huggingface"
-  model_dir: "/mnt/mnt/public/liuzhihao/libero_sft_model_all/sft/libero_spatial_lerobot/few_1/checkpoints/030000/pretrained_model"
+  model_dir: "/mnt/mnt/public/chenkang/openpi-main/checkpoints/sft/pi0_libero/few_sft/30000"
   recompute_logprobs: False
   unnorm_key: libero_10
   enable_offload: False
@@ -125,98 +126,45 @@ actor:
     queue_name: "replay_buffer"
     queue_size: 0
   training_backend: "fsdp"
-  checkpoint_load_path: "/mnt/mnt/public/liuzhihao/libero_sft_model_all/sft/libero_spatial_lerobot/few_1/checkpoints/030000/pretrained_model"
+  checkpoint_load_path: "/mnt/mnt/public/chenkang/openpi-main/checkpoints/sft/pi0_libero/few_sft/30000"
   checkpoint_save_path: "/mnt/mnt/public/liuzhihao/result"
   micro_batch_size: 64
   global_batch_size: 512 # maximun : global batch size = micro batch size * actor num_processes.
   seed: 42
   enable_offload: False
-
+  load_data_for_test: False
   model:
-    model_name: "pi0"
-    # PI0 specific parameters from configuration_pi0.py
-    n_obs_steps: 1
-    chunk_size: 50 #! pi0 doesn't actually use this, n_action_steps is chunk_size here
-    n_action_steps: 50
-
-    adv_method: "grpo"
-    # sample mode for the policy, during the rollout stage, we use sde default
-    sample_mode: "ode"  
-    noise_level: 0.5 
-
-    # Shorter state and action vectors will be padded
-    max_state_dim: 32
-    max_action_dim: 32
-    resize_imgs_with_padding: [224, 224]
-    empty_cameras: 0
-    adapt_to_pi_aloha: False
-    use_delta_joint_actions_aloha: False
-
-    # Tokenizer
-    tokenizer_max_length: 48
-
-    # Projector
-    proj_width: 1024
-
-    # Decoding
-    num_steps: 3 
-
-    # action chunk size
-    act_steps: 5
-    # Attention utils
-    use_cache: True
-    attention_implementation: "eager"  # or fa2, flex
-    normalize_name: "libero_spatial_image"
-    # Finetuning settings
-    freeze_vision_encoder: True
-    train_expert_only: True
-    train_state_proj: True
-    # ----------Original parameters that may still be needed-----
-    action_dim: 7
-    num_action_chunks: ${.act_steps}
-    use_proprio: True # TODO: 这个为什么默认False?
-    unnorm_key: libero_10_no_noops
-    micro_batch_size: 1
-    val_micro_batch_size: 8
-    center_crop: False
-    name: vllm
-    temperature: 1.6
-    top_k: -1 # 0 for hf rollout, -1 for vllm rollout
-    top_p: 1
-    # for vllm rollout
-    tensor_model_parallel_size: 2
-    # for hf rollout
-    do_sample: False
-    # number of responses (i.e. num sample times)
-    traj_mini_batch_size: 2  # batch size for forward logprob : now need to be 1 due to self.process_tensor error
+    model_name: "openpi"
     precision: "bf16"
-    add_bias_linear: False
-    add_qkv_bias: True
-    vocab_size: 32000
-    hidden_size: 4096
-    policy_setup: "widowx_bridge"
-    # unnorm_key: "libero_10_no_noops"
-    vh_mode: null
-    image_size: [224, 224]
+    num_action_chunks: 5 # interface for the env
+    action_dim: 7
     is_lora: False
-    lora_rank: 32
     num_images_in_input: 2
-    attn_implementation: "flash_attention_2"
-    low_cpu_mem_usage: True
-    trust_remote_code: True
+    use_proprio: True
+    num_steps: 3
+    # openpi specific parameters
+    openpi:
+      noise_level: 0.5
+      action_chunk: ${actor.model.num_action_chunks}
+      num_steps: ${actor.model.num_steps}
+      train_expert_only: True
+      action_env_dim: ${actor.model.action_dim}
+      
+    
 
   optim:
-    lr: 2.0e-6
-    value_lr: 1.0e-4
+    lr: 1.0e-6
+    value_lr: 3.0e-3
     adam_beta1: 0.9
     adam_beta2: 0.95
     adam_eps: 1.0e-05
-    clip_grad: 1.0
+    clip_grad: 0.5
 
   tokenizer:
     tokenizer_type: "HuggingFaceTokenizer"
     # TODO: Update to PI0 model path when available
     tokenizer_model: "/mnt/mnt/public/liuzhihao/libero_sft_model_all/sft/libero_spatial_lerobot/few_1/checkpoints/030000/pretrained_model"
+    # /mnt/mnt/public/liuzhihao/megatron-infinigence-rl-chenk/pretrained_model/
     extra_vocab_size: 421
     use_fast: False
     trust_remote_code: True

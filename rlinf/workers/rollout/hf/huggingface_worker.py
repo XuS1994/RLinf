@@ -70,6 +70,21 @@ MODEL_BUFFER_NAMESPACES = {
             "prev_logprobs",
             "denoise_inds"
         ]
+    },
+    "openpi": {
+        "observation_keys": [
+            "observation/image",
+            "observation/wrist_image",
+            "observation/state",
+            "tokenized_prompt",
+            "tokenized_prompt_mask"
+        ],
+        "result_keys": [
+            "chains",
+            "prev_values",
+            "prev_logprobs",
+            "denoise_inds"
+        ]
     }
 }
 
@@ -138,7 +153,7 @@ class MultiStepRolloutWorker(Worker):
 
         self._component_placement = HybridComponentPlacement(cfg)
         self.channel = self.connect_channel(cfg.rollout.channel.name)
-        # TODO: rollout & actor align for pi0
+        # TODO: openpi check this 
         send_num = self._component_placement.get_world_size("rollout") * self.stage_num
         recv_num = self._component_placement.get_world_size("actor")
         {self._replay_buffer_name}
@@ -166,6 +181,9 @@ class MultiStepRolloutWorker(Worker):
         if self.cfg.actor.model.model_name == "pi0":
             # NOTE: process function of pi0 is initialized after model is initialized
             self.input_processor = self.hf_model.prepare_input
+        elif self.cfg.actor.model.model_name == "openpi":
+            self.input_processor = self.hf_model.input_transform
+        
         self.setup_sample_params()
         if self.cfg.rollout.get("enable_offload", False):
             self.offload_model()
@@ -195,12 +213,18 @@ class MultiStepRolloutWorker(Worker):
         }
 
     def predict(self, processed_obs, do_sample=True, mode="train"):
-        if self.cfg.actor.model.model_name == "pi0":
+        
+        if self.cfg.actor.model.model_name in ["pi0", "openpi"]:
             with torch.no_grad():
                 result = self.hf_model(
                     processed_obs,
                     mode=mode,
                 )
+            # openpi patch, drop the input for the model      
+            if self.cfg.actor.model.model_name == "openpi":
+                processed_obs.pop("image")
+                processed_obs.pop("image_mask")
+                processed_obs.pop("state")
             return result
 
         action_token_len = self.hf_model.action_dim * self.hf_model.num_action_chunks
@@ -296,12 +320,12 @@ class MultiStepRolloutWorker(Worker):
                 )
 
     async def generate(self):
+        breakpoint()
         if self.cfg.rollout.get("enable_offload", False):
             self.reload_model()
         self.buffer_list = []
         for i in range(self.stage_num):
             self.buffer_list.append(defaultdict(list))
-
         for rollout_epoch in range(self.cfg.algorithm.rollout_epoch):
             self._logger.info(f"Now epoch is={rollout_epoch}")
             for step in tqdm(
@@ -373,12 +397,13 @@ class MultiStepRolloutWorker(Worker):
         if self.cfg.rollout.get("enable_offload", False):
             self.reload_model()
         eval_info = defaultdict(list)
-
+        # breakpoint()
         for step in tqdm(
             range(self.cfg.algorithm.n_eval_chunk_steps), desc="Rollout in Eval Step"
         ):
             for i in range(self.stage_num):
                 env_batch = await self.recv_env_batch()
+
                 processed_obs = prepare_observations(
                     simulator_type=self.cfg.env.eval.simulator_type,
                     model_name=self.cfg.actor.model.model_name,

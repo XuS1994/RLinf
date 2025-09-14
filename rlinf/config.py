@@ -38,7 +38,7 @@ except ImportError:
     transformer_engine = None
     HAVE_TE = False
 
-SUPPORTED_MODEL_ARCHS = ["qwen2.5", "openvla", "openvla_oft", "pi0"]
+SUPPORTED_MODEL_ARCHS = ["qwen2.5", "openvla", "openvla_oft", "pi0", "openpi"]
 
 __all__ = ["build_config"]
 

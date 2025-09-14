@@ -17,7 +17,7 @@ num_images_in_input: 2
 # TODO : zhihao : this need to be compatible with the ordered reset state ids
 # num_envs: 16  # env for each gpu is num_envs / processes
 # num_envs: ${multiply:${algorithm.group_size}, ${algorithm.num_group_envs}}
-num_envs: 400
+num_envs: 496
 video_cfg:
   save_video: True
   info_on_video: True

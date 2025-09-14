@@ -1,3 +1,38 @@
+# new
+tmux 
+cd /mnt/mnt/public/chenkang/RLinf_openpi
+source /mnt/mnt/public/chenkang/miniconda/envs/openpi/bin/activate
+
+
+# test-1
+bash examples/embodiment/J2_run_pi0_grpo_8h100.sh J2_pi0_spatial_grpo_step3_lr1e6_grad05_bs64_nofilter_usenorm_noise05
+# test-2
+bash examples/embodiment/J2_run_pi0_grpo_8h100.sh J2_pi0_spatial_grpo_step3_lr1e6_grad05_bs128_usefilter_nonorm_noise05
+# test-3
+bash examples/embodiment/J2_run_pi0_grpo_8h100.sh J2_pi0_spatial_grpo_step3_lr1e6_grad05_bs128_usefilter_usenorm_noise03
+# test-4
+bash examples/embodiment/J2_run_pi0_grpo_8h100.sh J2_pi0_spatial_grpo_step3_lr1e6_grad05_bs128_usefilter_usenorm_noise05
+
+
+cd /mnt/mnt/public/chenkang/RLinf_openpi
+source /mnt/mnt/public/chenkang/miniconda/envs/openpi_2/bin/activate
+tmux 
+# test-5
+bash examples/embodiment/J2_run_pi0_grpo_8h100.sh J2_pi0_spatial_grpo_step3_lr1e6_grad05_bs128_usefilter_usenorm_noise07
+# test-6
+bash examples/embodiment/J2_run_pi0_grpo_8h100.sh J2_pi0_spatial_grpo_step3_lr1e7_grad05_bs64_usefilter_usenorm_noise05
+# test-7
+bash examples/embodiment/J2_run_pi0_grpo_8h100.sh J2_pi0_spatial_grpo_step3_lr5e7_grad05_bs128_usefilter_usenorm_noise05
+# test-8
+bash examples/embodiment/J2_run_pi0_grpo_8h100.sh J2_pi0_spatial_grpo_step10_lr1e6_grad05_bs128_usefilter_usenorm_noise07
+
+
+
+
+tensorboard --host 0.0.0.0 --logdir logs/
+
+source /mnt/public/chenkang/miniconda/envs/openpi/bin/activate
+# old
 conda activate /mnt/public/mjwei/conda_envs/zqlenv_wmj_0729
 
 bash examples/embodiment/run_pi0.sh
@@ -8,13 +43,11 @@ cd /mnt/public/chenkang/megatron-infinigence-rl-chenk/
 source /mnt/public/chenkang/miniconda/envs/openpi/bin/activate
 tensorboard --host 0.0.0.0 --logdir /mnt/public/liuzhihao/RLinf_0828/logs
 tensorboard --host 0.0.0.0 --logdir /mnt/mnt/public/liuzhihao/RLinf_0828/logs
-
 tensorboard --host 0.0.0.0 --logdir /mnt/public/chenkang/megatron-infinigence-rl-chenk/logs/
-
 tensorboard --host 0.0.0.0 --logdir outputs/rl
 
 
-cd /mnt/public/chenkang/eai/
+cd /mnt/public/chenkang/RLinf_openpi
 source /mnt/public/chenkang/miniconda/envs/openpi/bin/activate
 tensorboard --host 0.0.0.0 --logdir outputs/rl
 

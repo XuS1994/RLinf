@@ -19,7 +19,7 @@ export HYDRA_FULL_ERROR=1
 
 
 if [ -z "$1" ]; then
-    CONFIG_NAME="libero_grpo_pi0_rank2"
+    CONFIG_NAME="libero_grpo_pi0"
 else
     CONFIG_NAME=$1
 fi

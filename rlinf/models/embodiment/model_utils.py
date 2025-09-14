@@ -14,6 +14,7 @@
 
 from typing import Any, Optional
 
+from flax.nnx import State
 import torch
 import torch.nn.functional as F
 from transformers.generation import TopKLogitsWarper
@@ -118,7 +119,7 @@ def prepare_observations_for_vla(
     device: torch.device = torch.device("cuda:0"),
     num_images_in_input: int = 1,
 ):
-    if model_name == "pi0":
+    if model_name in ["pi0", "openpi"]:
         task_descriptions = list(raw_obs["task_descriptions"])
     else:
         task_descriptions = [
@@ -131,6 +132,7 @@ def prepare_observations_for_vla(
     if simulator_type == "libero":
         if num_images_in_input > 1:
             main_image_tensor = torch.stack([
+                # TODO: zhihao : just for check if it is correct
                 value.clone().to(device).permute(2, 0, 1)
                 for value in raw_obs["images_and_states"]["full_image"]
             ])
@@ -195,6 +197,23 @@ def prepare_observations_for_vla(
                 "observation.state": proprio_states['state'].to(torch.float32),
             }
         )
+    elif model_name == "openpi":
+        # to process
+        to_process_input = {
+            "observation/image": main_image_tensor,
+            "observation/wrist_image": wrist_image_tensor,
+            "observation/state": proprio_states['state'],
+            "prompt": task_descriptions,
+        }
+        processed_obs = processor(to_process_input)
+        # save original, to tensor for interface
+        processed_obs.update(
+            {
+                "observation/image": main_image_tensor,
+                "observation/wrist_image": wrist_image_tensor,
+                "observation/state": proprio_states['state'],
+            }
+        )
 
     # processed_obs = processed_obs.to(device=device, dtype=precision)
     for key, value in processed_obs.items():
@@ -202,7 +221,10 @@ def prepare_observations_for_vla(
             processed_obs[key] = [item.to(device=device).contiguous() if torch.is_tensor(item) else item for item in value]
         elif torch.is_tensor(value):
             processed_obs[key] = value.to(device=device).contiguous()
-
+        # todo: patch for openpi
+        elif isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                processed_obs[key][sub_key] = sub_value.to(device=device).contiguous()
     return processed_obs
 
 
@@ -217,7 +239,7 @@ def prepare_observations(
     device: torch.device = torch.device("cuda:0"),
     num_images_in_input: int = 1,
 ):
-    if model_name == "openvla" or model_name == "openvla_oft" or model_name == "pi0":
+    if model_name == "openvla" or model_name == "openvla_oft" or model_name == "pi0" or model_name == "openpi":
         return prepare_observations_for_vla(
             simulator_type=simulator_type,
             model_name=model_name,
