@@ -23,7 +23,11 @@ from prismatic.extern.hf.configuration_prismatic import (
 from prismatic.extern.hf.modeling_prismatic import (
     OpenVLAForActionPrediction as OpenVLAOFTForActionPrediction,
 )
-from prismatic.vla.constants import STOP_INDEX
+from prismatic.vla.constants import (
+    ACTION_PROPRIO_NORMALIZATION_TYPE,
+    STOP_INDEX,
+    NormalizationType,
+)
 from transformers.generation import TopKLogitsWarper
 
 from rlinf.models.embodiment.modules.value_head import ValueHead
@@ -140,6 +144,44 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         attention_mask = torch.cat([attention_mask, mask_extension], dim=-1)
 
         return input_ids, attention_mask
+
+    def _unnormalize_actions(self, normalized_actions, unnorm_key=None):
+        """Unnormalize actions using dataset statistics"""
+        action_norm_stats = self.get_action_stats(unnorm_key)
+
+        if ACTION_PROPRIO_NORMALIZATION_TYPE == NormalizationType.BOUNDS:
+            mask = action_norm_stats.get(
+                "mask", np.ones_like(action_norm_stats["min"], dtype=bool)
+            )
+            action_high, action_low = (
+                np.array(action_norm_stats["max"]),
+                np.array(action_norm_stats["min"]),
+            )
+        elif ACTION_PROPRIO_NORMALIZATION_TYPE == NormalizationType.BOUNDS_Q99:
+            mask = action_norm_stats.get(
+                "mask", np.ones_like(action_norm_stats["q01"], dtype=bool)
+            )
+            action_high, action_low = (
+                np.array(action_norm_stats["q99"]),
+                np.array(action_norm_stats["q01"]),
+            )
+        else:
+            raise ValueError("Unsupported action/proprio normalization type detected!")
+
+        action_dim = normalized_actions.shape[-1]
+        repeat_factor = action_dim // action_high.shape[0]
+        action_high = action_high.repeat(repeat_factor)
+        action_low = action_low.repeat(repeat_factor)
+        mask = mask * repeat_factor
+
+        actions = np.where(
+            mask,
+            0.5 * (normalized_actions + 1) * (action_high - action_low + 1e-8)
+            + action_low,
+            normalized_actions,
+        )
+
+        return actions
 
     @torch.no_grad()
     def predict_action_batch(

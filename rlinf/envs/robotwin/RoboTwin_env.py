@@ -517,8 +517,11 @@ class RoboTwin(gym.Env):
 
     def step(self, actions=None):
         if actions is None:
-            actions = np.zeros((self.n_envs, self.horizon, self.action_dim))
-        self.share_actions[:] = actions.flatten()
+            self.share_actions[:] = np.zeros(
+                (self.n_envs, self.horizon, self.action_dim)
+            ).flatten()
+        else:
+            self.share_actions[:] = actions.flatten()
 
         # Release semaphore, indicating actions have been updated
         for i in range(self.n_envs):
@@ -535,6 +538,8 @@ class RoboTwin(gym.Env):
         obs_venv, reward_venv, terminated_venv, truncated_venv, info_venv = (
             self.transform(results)
         )
+        if actions is None:
+            reward_venv = None
         return obs_venv, reward_venv, terminated_venv, truncated_venv, info_venv
 
     def reset(self):

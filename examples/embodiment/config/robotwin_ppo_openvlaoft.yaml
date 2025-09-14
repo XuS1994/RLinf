@@ -123,7 +123,7 @@ actor:
     action_dim: 14
     num_action_chunks: 8
     use_proprio: False
-    unnorm_key: robotwin_orig
+    unnorm_key: bridge_orig
     center_crop: True
 
     precision: "bf16"
