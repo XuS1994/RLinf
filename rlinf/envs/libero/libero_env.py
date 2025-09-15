@@ -417,6 +417,7 @@ class LiberoEnv(gym.Env):
             chunk_terminations = raw_chunk_terminations.clone()
             chunk_truncations = raw_chunk_truncations.clone()
         # TODO: zhihao : add success_once to infos["episode"] for each rank
+        # TODO: zhihao : modify here to align with eval mode with 500 states
         infos["episode"][f"per_task_eval/task_{self.rank}"] = infos["episode"]["success_once"]
         return (
             extracted_obs,

@@ -73,7 +73,7 @@ algorithm:
   gamma: 0.99
   gae_lambda: 0.95
   use_norm_adv: True
-  filter_rewards: True
+  filter_rewards: False
   rewards_lower_bound: 0.1
   rewards_upper_bound: 0.9
   # params for generation
@@ -149,6 +149,7 @@ actor:
       num_steps: ${actor.model.num_steps}
       train_expert_only: True
       action_env_dim: ${actor.model.action_dim}
+      noise_method: "flow_cps"
       
     
 

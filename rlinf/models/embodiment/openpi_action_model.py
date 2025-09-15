@@ -228,17 +228,21 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch):
         Sample the mean, variance and value of the action at a given timestep.
         Rollout sample (idx is int) and actor get_log_prob_value (idx is tensor) will load this function.
         """
-        # parameters
+        # expand the shape
         bsize = state.shape[0]
         device = state.device
-        timesteps,sigmas = self.build_parameters(denoise_steps,device)
-        sigma_i = sigmas[idx]
-        delta = timesteps[idx + 1] - timesteps[idx]
-        t_i = timesteps[idx]
         if isinstance(idx,int):
-            t_input = timesteps[idx].expand(bsize) 
+            idx = torch.tensor(idx).expand(bsize)
+        # build parameters
+        if hasattr(self.config, "noise_level"):
+            noise_level = torch.tensor(self.config.noise_level).to(device)
         else:
-            t_input = timesteps[idx]
+            noise_level = torch.tensor(0).to(device)
+        timesteps = torch.linspace(1, 1 / denoise_steps, denoise_steps, device=device)
+        timesteps = torch.cat([timesteps, torch.tensor([0.0], device=device)])
+        # input parameters
+        t_input = timesteps[idx]
+        delta = timesteps[idx] - timesteps[idx + 1]
         # velocity prediction
         suffix_out = self.get_suffix_out(
             state,
@@ -254,40 +258,35 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch):
             value_t = self.value_proj(suffix_out)[:,0]
         else:
             value_t = torch.zeros((bsize),device=device)
-        # ode sampling in rollout
+        # ode sde mix sampling
+        delta = delta[:,None,None].expand_as(x_t)
+        t_input = t_input[:,None,None].expand_as(x_t)
+        x0_pred = x_t - v_t * t_input
+        x1_pred = x_t + v_t * (1 - t_input)
         if mode == "eval":
-            weight_x = 1
-            weight_v = 1
-            weight_std = 0
-        # sde sampling in rollout
-        elif mode == "train":
-            weight_x = 1 + sigma_i**2 / (2 * t_i) * delta
-            weight_v = 1 + sigma_i**2 * (1 - t_i) / (2 * t_i)
-            weight_std = torch.sqrt(-delta)
-        elif mode == "compute_logprob":
-            weight_x = torch.ones_like(sigma_i) + sigma_i**2 / (2 * t_i) * delta
-            weight_v = torch.ones_like(sigma_i) + sigma_i**2 * (1 - t_i) / (2 * t_i)
-            weight_std = torch.sqrt(-delta)
-            weight_x = weight_x[:,None,None].expand_as(x_t)
-            weight_v = weight_v[:,None,None].expand_as(x_t)
-            weight_std = weight_std[:,None,None].expand_as(x_t)
-            delta = delta[:,None,None].expand_as(x_t)
-            sigma_i = sigma_i[:,None,None].expand_as(x_t)
-        else:
-            raise ValueError(f"Invalid mode: {mode}")
-        # sample next
-        x_t_mean = x_t * weight_x + v_t * weight_v * delta
-        x_t_std = sigma_i * weight_std
+            x0_weight = 1 - (t_input - delta)
+            x1_weight = t_input - delta
+            x_t_std = torch.zeros_like(t_input)
+        elif mode in ["train","compute_logprob"]:
+            if self.config.noise_method == "flow_sde":
+                sigmas = noise_level * torch.sqrt(
+                    timesteps / (1 - torch.where(timesteps == 1, timesteps[1], timesteps))
+                )[:-1]
+                sigma_i = sigmas[idx][:,None,None].expand_as(x_t)
+                x0_weight = torch.ones_like(t_input) - (t_input - delta)
+                x1_weight = t_input - delta - sigma_i**2 * delta / (2 * t_input) 
+                x_t_std = torch.sqrt(delta) * sigma_i
+            elif self.config.noise_method == "flow_cps":
+                pi = torch.pi
+                cos_term = torch.cos(pi * noise_level / 2).to(device)
+                sin_term = torch.sin(pi * noise_level / 2).to(device)
+                x0_weight = torch.ones_like(t_input) - (t_input - delta)
+                x1_weight = (t_input - delta) * cos_term
+                x_t_std = (t_input - delta) * sin_term
+            else:
+                raise ValueError(f"Invalid noise method: {self.config.noise_method}")
+        x_t_mean = x0_pred * x0_weight + x1_pred * x1_weight
         return x_t_mean,x_t_std,value_t
-
-    def build_parameters(self,num_steps,device):
-        timesteps = torch.linspace(1, 1 / num_steps, num_steps, device=device)
-        timesteps = torch.cat([timesteps, torch.tensor([0.0], device=device)])
-        sigmas = self.config.noise_level * torch.sqrt(
-            timesteps / (1 - torch.where(timesteps == 1, timesteps[1], timesteps))
-        )
-        sigmas = sigmas[:-1] 
-        return timesteps,sigmas
 
     def get_suffix_out(
         self,
@@ -335,9 +334,11 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch):
     def get_logprob_norm(self,sample,mu,sigma):
         if torch.sum(torch.abs(sigma)) == 0:
             return torch.zeros_like(sample)
+        sigma_safe = torch.where(sigma == 0, torch.ones_like(sigma), sigma)
         constant_term = -torch.log(sigma) - 0.5 * torch.log(2 * torch.pi * torch.ones_like(sample))
-        exponent_term = -0.5 * torch.pow((sample - mu) / sigma, 2)
+        exponent_term = -0.5 * torch.pow((sample - mu) / sigma_safe, 2)
         log_prob = constant_term + exponent_term
+        log_prob = torch.where(sigma == 0, torch.zeros_like(log_prob), log_prob)
         return log_prob
 
     def preprocess_for_train(self, data):

@@ -46,7 +46,7 @@ algorithm:
   shuffle_samples: True
   normalize_advantages: True
   kl_penalty: kl  # how to estimate kl divergence: kl or kl_penalty
-  group_size: 4
+  group_size: 8
   n_chunk_steps: 48
   n_eval_chunk_steps: 48
   # training generation mbs
@@ -126,7 +126,7 @@ actor:
   checkpoint_load_path: "/mnt/mnt/public/liuzhihao/openpi-main/checkpoints/sft/pi0_libero/few_sft/30000/30000"
   checkpoint_save_path: "/mnt/mnt/public/liuzhihao/result"
   micro_batch_size: 64
-  global_batch_size: 128 # maximun : global batch size = micro batch size * actor num_processes.
+  global_batch_size: 256 # maximun : global batch size = micro batch size * actor num_processes.
   seed: 1234
   enable_offload: False
   load_data_for_test: False
@@ -146,6 +146,7 @@ actor:
       num_steps: ${actor.model.num_steps}
       train_expert_only: True
       action_env_dim: ${actor.model.action_dim}
+      noise_method: "flow_sde_patch" 
       
     
     
