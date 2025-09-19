@@ -144,34 +144,36 @@ class FSDPModelManager:
             use_orig_params=self._cfg.fsdp.use_orig_params,
         )
 
-        # NOTE: Currently we assume that only the value head contains "value_head" in its name.
-        # The value head only serves for value prediction in RL algorithms like PPO.
-        param_groups = [
-            {
-                "params": [
-                    p
-                    for n, p in self.model.named_parameters()
-                    if "value_head" not in n and p.requires_grad
-                ],
-                "lr": self._cfg.optim.lr,
-                "betas": betas,
-            },
-        ]
+        params_actor = []
+        params_critic = []
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                if "model.value_proj" in name or "model.value_head" in name:
+                    params_critic.append(param)
+                else:
+                    params_actor.append(param)
 
-        if self._cfg.model.get("vh_mode", None) in ["a", "a0", "a6"]:
-            param_groups.append(
-                {
-                    "params": [
-                        p
-                        for n, p in self.model.named_parameters()
-                        if "value_head" in n and p.requires_grad
-                    ],
-                    "lr": self._cfg.optim.value_lr,
-                    "betas": betas,
-                }
+        if len(params_actor) > 0:
+            self.optimizer = optim.AdamW(
+                [
+                    {"params": params_actor, "lr": self._cfg.optim.lr, "betas": betas},
+                    {
+                        "params": params_critic,
+                        "lr": self._cfg.optim.value_lr,
+                        "betas": betas,
+                    },
+                ]
             )
-
-        self.optimizer = optim.AdamW(param_groups)
+        else:
+            self.optimizer = optim.AdamW(
+                [
+                    {
+                        "params": params_actor,
+                        "lr": self._cfg.optim.value_lr,
+                        "betas": betas,
+                    },
+                ]
+            )
 
     def get_model_state_dict(self):
         with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
