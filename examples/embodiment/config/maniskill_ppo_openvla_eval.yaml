@@ -136,6 +136,7 @@ actor:
     vocab_size: 32000
     hidden_size: 4096
     policy_setup: "widowx_bridge"
+    add_value_head: True
     vh_mode: "a0"
     image_size: [224, 224]
     is_lora: False
