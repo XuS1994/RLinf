@@ -186,7 +186,7 @@ class EnvWorker(Worker):
             num_action_chunks=self.cfg.actor.model.num_action_chunks,
             action_dim=self.cfg.actor.model.action_dim,
         )
-        env_info_list = {}
+        env_info = {}
 
         extracted_obs, chunk_rewards, chunk_terminations, chunk_truncations, infos = (
             self.simulator_list[stage_id].chunk_step(chunk_actions)
@@ -198,14 +198,12 @@ class EnvWorker(Worker):
                     assert chunk_truncations[:, -1].all()
                     if "episode" in infos:
                         for key in infos["episode"]:
-                            env_info_list[key] = infos["episode"][key].cpu()
+                            env_info[key] = infos["episode"][key].cpu()
         elif chunk_dones.any():
             if "final_info" in infos:
                 final_info = infos["final_info"]
                 for key in final_info["episode"]:
-                    env_info_list[key] = final_info["episode"][key][
-                        chunk_dones[:, -1]
-                    ].cpu()
+                    env_info[key] = final_info["episode"][key][chunk_dones[:, -1]].cpu()
 
         env_output = EnvOutput(
             simulator_type=self.cfg.env.train.simulator_type,
@@ -216,7 +214,7 @@ class EnvWorker(Worker):
             rewards=chunk_rewards,
             dones=chunk_dones,
         )
-        return env_output, env_info_list
+        return env_output, env_info
 
     def env_evaluate_step(
         self, raw_actions: torch.Tensor, stage_id: int
@@ -267,14 +265,6 @@ class EnvWorker(Worker):
             )
         chunk_action = np.concatenate(chunk_action, axis=0)
         return chunk_action
-
-    def concat_tensor(self, tensor_dict):
-        for key, value in tensor_dict.items():
-            if "env_info/" not in key:
-                tensor_dict[key] = torch.stack(value, dim=0).contiguous()
-            else:
-                tensor_dict[key] = torch.cat(value, dim=0).contiguous()
-        return tensor_dict
 
     def finish_rollout(self, mode="train"):
         # reset
@@ -330,9 +320,10 @@ class EnvWorker(Worker):
     async def interact(self):
         for simulator in self.simulator_list:
             simulator.start_simulator()
+
+        env_metrics = defaultdict(list)
         for _ in range(self.cfg.algorithm.rollout_epoch):
             env_output_list = []
-            env_info_list_list = []
             if not self.cfg.env.train.auto_reset:
                 for i in range(self.stage_num):
                     self.simulator_list[i].is_start = True
@@ -354,7 +345,6 @@ class EnvWorker(Worker):
                         else None,
                     )
                     env_output_list.append(env_output)
-                    env_info_list_list.append(infos)
             else:
                 self.num_done_envs = 0
                 self.num_succ_envs = 0
@@ -366,7 +356,6 @@ class EnvWorker(Worker):
                         dones=self.last_dones_list[i],
                     )
                     env_output_list.append(env_output)
-                    env_info_list_list.append([])
 
             for stage_id in range(self.stage_num):
                 env_output: EnvOutput = env_output_list[stage_id]
@@ -375,12 +364,13 @@ class EnvWorker(Worker):
             for _ in range(self.cfg.algorithm.n_chunk_steps):
                 for stage_id in range(self.stage_num):
                     raw_chunk_actions = await self.recv_chunk_actions()
-                    env_output, env_info_list = self.env_interact_step(
+                    env_output, env_info = self.env_interact_step(
                         raw_chunk_actions, stage_id
                     )
                     await self.send_env_batch(env_output.to_dict())
                     env_output_list[stage_id] = env_output
-                    env_info_list_list[stage_id] = env_info_list
+                    for key, value in env_info.items():
+                        env_metrics[key].append(value)
 
             self.last_obs_list = [env_output.obs for env_output in env_output_list]
             self.last_dones_list = [env_output.dones for env_output in env_output_list]
@@ -389,13 +379,18 @@ class EnvWorker(Worker):
         for simulator in self.simulator_list:
             simulator.stop_simulator()
 
+        for key, value in env_metrics.items():
+            env_metrics[key] = torch.cat(value, dim=0).contiguous().cpu()
+
+        return env_metrics
+
     async def evaluate(self):
         for i in range(self.stage_num):
             self.eval_simulator_list[i].start_simulator()
             self.eval_simulator_list[i].is_start = True
             extracted_obs, _, _, _, infos = self.eval_simulator_list[i].step()
             env_output = EnvOutput(
-                simulator_type=self.cfg.env.train.simulator_type,
+                simulator_type=self.cfg.env.eval.simulator_type,
                 obs=extracted_obs,
                 final_obs=infos["final_observation"]
                 if "final_observation" in infos
@@ -421,6 +416,6 @@ class EnvWorker(Worker):
             self.eval_simulator_list[i].stop_simulator()
 
         for key, value in eval_metrics.items():
-            eval_metrics[key] = torch.stack(value, dim=0).contiguous().cpu()
+            eval_metrics[key] = torch.cat(value, dim=0).contiguous().cpu()
 
         return eval_metrics
