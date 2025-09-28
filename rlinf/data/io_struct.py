@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple
-
-from numpy import isin
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import torch
 from omegaconf import DictConfig
-from vllm.outputs import CompletionOutput
-from vllm.outputs import RequestOutput as VllmRequestOutput
+
+if TYPE_CHECKING:
+    from vllm.outputs import CompletionOutput
+    from vllm.outputs import RequestOutput as VllmRequestOutput
 
 from rlinf.data.datasets import batch_pad_to_fixed_len
 from rlinf.utils.data_iter_utils import (
@@ -257,12 +256,12 @@ class RolloutResult:
     @staticmethod
     def from_vllm_results(
         group_size: int,
-        results: List[VllmRequestOutput],
+        results: List["VllmRequestOutput"],
         answers: Optional[List[List[int]]] = None,
         return_logprobs: bool = False,
     ) -> "RolloutResult":
         def get_logprobs(
-            response_ids: List[int], output: CompletionOutput
+            response_ids: List[int], output: "CompletionOutput"
         ) -> List[float]:
             logprobs = []
             returned_logprobs = output.logprobs
@@ -734,13 +733,13 @@ class EnvOutput:
     simulator_type: str
     obs: Dict[str, Any]
     final_obs: Optional[Dict[str, Any]]=None
-    dones: torch.Tensor # [B]
+    dones: Optional[torch.Tensor]=None # [B]
     rewards: Optional[torch.Tensor]=None # [B]
 
     def __post_init__(self):
         self.obs = put_tensor_cpu(self.obs)
         self.final_obs = put_tensor_cpu(self.final_obs) if self.final_obs is not None else None
-        self.dones = self.dones.cpu().contiguous()
+        self.dones = self.dones.cpu().contiguous() if self.dones is not None else None
         self.rewards = self.rewards.cpu().contiguous() if self.rewards is not None else None
 
     def prepare_observations(self, obs: Dict[str, Any]) -> Dict[str, Any]:
@@ -766,10 +765,6 @@ class EnvOutput:
             image_tensor = obs["images"]
         else:
             raise NotImplementedError
-        # Add num_images dimension
-        if image_tensor.ndim == 4:
-            image_tensor = image_tensor.unsqueeze(1)
-        assert image_tensor.ndim == 5
 
         states = obs["images_and_states"]["state"] if "state" in obs["images_and_states"] else None
 
@@ -796,84 +791,48 @@ class EnvOutput:
 class EmbodiedRolloutResult:
 
     # required
-    actions: List[torch.Tensor] = []
-    prev_logprobs: List[torch.Tensor] = []
-    prev_values: List[torch.Tensor] = []
-    dones: List[torch.Tensor] = []
-    rewards: List[torch.Tensor] = []
+    prev_logprobs: List[torch.Tensor] = field(default_factory=list)
+    prev_values: List[torch.Tensor] = field(default_factory=list)
+    dones: List[torch.Tensor] = field(default_factory=list)
+    rewards: List[torch.Tensor] = field(default_factory=list)
 
-    processed_obs: List[Dict[str, Any]] = []
-
-    # vla
-    action_tokens: Optional[List[torch.Tensor]] = None
-
-    # openpi
-    chains: Optional[List[torch.Tensor]] = None
-    denoise_inds: Optional[List[torch.Tensor]] = None
+    inputs_data: List[Dict[str, Any]] = field(default_factory=list)
     
-
     def __post_init__(self):
-        self.actions = [action.cpu().contiguous() for action in self.actions]
         self.prev_logprobs = [prev_logprob.cpu().contiguous() for prev_logprob in self.prev_logprobs] if self.prev_logprobs is not None else []
         self.prev_values = [prev_value.cpu().contiguous() for prev_value in self.prev_values] if self.prev_values is not None else []
-
         self.dones = [done.cpu().contiguous() for done in self.dones] if self.dones is not None else []
         self.rewards = [reward.cpu().contiguous() for reward in self.rewards] if self.rewards is not None else []
 
-        self.action_tokens = [action_token.cpu().contiguous() for action_token in self.action_tokens] if self.action_tokens is not None else None
-
-        self.chains = [chain.cpu().contiguous() for chain in self.chains] if self.chains is not None else None
-        self.denoise_inds = [denoise_ind.cpu().contiguous() for denoise_ind in self.denoise_inds] if self.denoise_inds is not None else None
-
-        self.processed_obs = [put_tensor_cpu(processed_obs) for processed_obs in self.processed_obs]
+        self.inputs_data = [put_tensor_cpu(inputs_data) for inputs_data in self.inputs_data]
 
     def append_result(self, result: Dict[str, Any]):
-        self.actions.append(result["actions"].cpu().contiguous())
         self.prev_logprobs.append(result["prev_logprobs"].cpu().contiguous()) if "prev_logprobs" in result else []
         self.prev_values.append(result["prev_values"].cpu().contiguous()) if "prev_values" in result else []
-        
         self.dones.append(result["dones"].cpu().contiguous()) if "dones" in result else []
         self.rewards.append(result["rewards"].cpu().contiguous()) if "rewards" in result else []
 
-        if "action_tokens" in result:
-            self.action_tokens.append(result["action_tokens"].cpu().contiguous()) 
-
-        if "chains" in result:
-            self.chains.append(result["chains"].cpu().contiguous()) 
-
-        if "denoise_inds" in result:
-            self.denoise_inds.append(result["denoise_inds"].cpu().contiguous()) 
-
-        self.processed_obs.append(put_tensor_cpu(result["processed_obs"]))
+        self.inputs_data.append(put_tensor_cpu(result["inputs_data"]))
 
     def to_dict(self):
 
-        merged_processed_obs = {}
-        for processed_obs in self.processed_obs:
-            for k, v in processed_obs.items():
-                merged_processed_obs[k].append(v) if k in merged_processed_obs else merged_processed_obs[k] = [v]
-        for k in merged_processed_obs:
-            merged_processed_obs[k] = torch.cat(merged_processed_obs[k], dim=0).contiguous().cpu()
-
         rollout_result_dict = {}
-        rollout_result_dict["actions"] = torch.cat(self.actions, dim=0).contiguous().cpu()
-        rollout_result_dict["prev_logprobs"] = torch.cat(self.prev_logprobs, dim=0).contiguous().cpu()
-        rollout_result_dict["prev_values"] = torch.cat(self.prev_values, dim=0).contiguous().cpu()
+        rollout_result_dict["prev_logprobs"] = torch.stack(self.prev_logprobs, dim=0).cpu().contiguous() if len(self.prev_logprobs) > 0 else None
+        rollout_result_dict["prev_values"] = torch.stack(self.prev_values, dim=0).cpu().contiguous() if len(self.prev_values) > 0 else None
+        rollout_result_dict["dones"] = torch.stack(self.dones, dim=0).cpu().contiguous() if len(self.dones) > 0 else None
+        rollout_result_dict["rewards"] = torch.stack(self.rewards, dim=0).cpu().contiguous() if len(self.rewards) > 0 else None
+        merged_inputs_data = {}
+        for data in self.inputs_data:
+            for k, v in data.items():
+                if k in merged_inputs_data:
+                    merged_inputs_data[k].append(v)
+                else:
+                    merged_inputs_data[k] = [v]
+        for k in merged_inputs_data.keys():
+            assert k not in ["dones", "rewards", "prev_logprobs", "prev_values"]
+            rollout_result_dict[k] = torch.stack(merged_inputs_data[k], dim=0).cpu().contiguous()
 
-        rollout_result_dict["dones"] = torch.cat(self.dones, dim=0).contiguous().cpu()
-        rollout_result_dict["rewards"] = torch.cat(self.rewards, dim=0).contiguous().cpu()
-        
-        if self.action_tokens is not None:
-            rollout_result_dict["action_tokens"] = torch.cat(self.action_tokens, dim=0).contiguous().cpu()
-        
-        if self.chains is not None:
-            rollout_result_dict["chains"] = torch.cat(self.chains, dim=0).contiguous().cpu()
-        if self.denoise_inds is not None:
-            rollout_result_dict["denoise_inds"] = torch.cat(self.denoise_inds, dim=0).contiguous().cpu()
-
-        rollout_result_dict["processed_obs"] = merged_processed_obs
         return rollout_result_dict
-
 
     def to_splited_dict(self, split_size)->List[Dict[str, Any]]:
 
@@ -883,11 +842,7 @@ class EmbodiedRolloutResult:
         
             for key, value in rollout_result_list[i].items():
                 if isinstance(value, torch.Tensor):
-                    rollout_result_list[i][key] = torch.chunk(value, split_size, dim=0)[i]
-                    
-                elif isinstance(value, dict):
-                    for k, v in value.items():
-                        rollout_result_list[i][key][k] = torch.chunk(v, split_size, dim=0)[i]
+                    rollout_result_list[i][key] = torch.chunk(value, split_size, dim=0)[i].contiguous()
                 else:
                     raise ValueError(f"Unsupported type: {type(value)}")
 
