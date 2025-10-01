@@ -65,14 +65,6 @@ def worker(
 
     envs_finish = False
 
-    def filling_up(return_poses):
-        if len(return_poses) < HORIZON:
-            new_poses = np.empty((HORIZON, *return_poses.shape[1:]))
-            new_poses[: len(return_poses)] = return_poses
-            new_poses[len(return_poses) :] = return_poses[-1]
-            return new_poses
-        return return_poses
-
     task = class_decorator(task_name)
 
     valid_seed = False
@@ -94,8 +86,7 @@ def worker(
     action_input_sem.acquire()
     task.run_steps = 0  # Used to record current step, ends when greater than max steps per environment (450 steps in shoe_place)
     prev_obs_venv = task.get_obs()
-    return_pose = np.array([task.get_return_pose()])
-    return_pose = filling_up(return_pose)
+    is_success = np.array([0])
     prev_obs_venv = [prev_obs_venv]
     image_return = update_obs(prev_obs_venv[-1])[0] + update_obs(prev_obs_venv[-1])[0]
     state_return = update_obs(prev_obs_venv[-1])[1]
@@ -109,7 +100,7 @@ def worker(
             np.array([0]),
             np.array([0]),
             np.array([0]),
-            return_pose.flatten(),
+            is_success.flatten(),
         ]
     )
     results[RESULT_SIZE * process_id : (process_id + 1) * RESULT_SIZE] = result
@@ -162,7 +153,7 @@ def worker(
                     np.array([0]),
                     np.array([0]),
                     np.array([1]),
-                    return_pose.flatten(),
+                    is_success.flatten(),
                 ]
             )
             results[RESULT_SIZE * process_id : RESULT_SIZE * (process_id + 1)] = result
@@ -177,12 +168,9 @@ def worker(
         truncated_venv,
         info_venv,
         """
-        obs_venv, reward_venv, terminated_venv, _, return_poses = (
+        obs_venv, reward_venv, terminated_venv, _, info_venv = (
             task.gen_dense_reward_once(input_actions)
         )
-        # TODO something return_poses is [1,6], sometimes is [2,6]
-        return_poses = return_poses[0:1, :]
-        return_poses = filling_up(return_poses)
         if len(obs_venv) > 1:  # Indicates not finished/successful
             image_return = update_obs(obs_venv[-2])[0] + update_obs(obs_venv[-1])[0]
             state_return = update_obs(obs_venv[-1])[1]
@@ -230,7 +218,7 @@ def worker(
                 reward_venv.flatten(),
                 terminated_venv.flatten(),
                 np.array([0]),
-                return_poses.flatten(),
+                info_venv.flatten(),
             ]
         )
         results[RESULT_SIZE * process_id : RESULT_SIZE * (process_id + 1)] = result
@@ -344,7 +332,7 @@ class RoboTwin(gym.Env):
         self.NUM_IMAGES = 6
         self.IMAGE_SHAPE = (240, 320, 3)  # Shape of each image
         self.STATE_SHAPE = (1, 14)  # Shape of state vector
-        self.TARGET_SHAPE = (self.horizon, 6)  # Target object xyz + target position xyz
+        self.TARGET_SHAPE = (1)  # Target is success or not
 
         self.IMAGE_SIZE = np.prod(self.IMAGE_SHAPE)  # Size of each image
         self.STATE_SIZE = np.prod(self.STATE_SHAPE)  # Size of state vector
@@ -589,8 +577,7 @@ class RoboTwin(gym.Env):
             reward_venv[i] = torch.from_numpy(result["reward"]).to(self.device)
             terminated_venv[i] = torch.from_numpy(result["terminated"]).to(self.device)
             truncated_venv[i] = torch.from_numpy(result["truncated"]).to(self.device)
-            success_per_env = self.check_success(result["return_poses"])
-            info_venv["success"].append(torch.tensor(success_per_env).to(self.device))
+            info_venv["success"].append(torch.tensor(result["is_success"]).to(self.device))
         info_venv["success"] = torch.stack(info_venv["success"])
         obs_venv["images"] = torch.stack(obs_venv["images"]).permute(0, 1, 4, 2, 3)
         obs_venv["state"] = torch.stack(obs_venv["state"])
@@ -677,10 +664,8 @@ class RoboTwin(gym.Env):
             start += 1
             cond["truncated"] = result[start : start + 1]
             start += 1
-            cond["return_poses"] = result[start : start + self.TARGET_SIZE].reshape(
-                self.TARGET_SHAPE
-            )
-            start += self.TARGET_SIZE
+            cond["is_success"] = result[start : start + 1]
+            start += 1
             conds.append(cond)
         return conds
 
