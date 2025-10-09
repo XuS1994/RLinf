@@ -1,5 +1,5 @@
-RL与RoboTwin仿真器
-=====================
+基于RoboTwin模拟器的强化学习训练
+================================
 
 .. |huggingface| image:: /_static/svg/hf-logo.svg
    :width: 16px
@@ -222,7 +222,7 @@ RL与RoboTwin仿真器
 
 1. 查看`CuRobo文档 <https://github.com/NVlabs/curobo>`_
 2. 查看`RoboTwin文档 <https://github.com/RoboTwin-Platform/RoboTwin>`_
-3. 在RLinf中创建问题
+3. 在RLinf中创建issue
 
 许可证
 -------

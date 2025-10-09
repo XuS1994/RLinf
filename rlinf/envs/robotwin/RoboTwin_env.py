@@ -332,7 +332,7 @@ class RoboTwin(gym.Env):
         self.NUM_IMAGES = 6
         self.IMAGE_SHAPE = (240, 320, 3)  # Shape of each image
         self.STATE_SHAPE = (1, 14)  # Shape of state vector
-        self.TARGET_SHAPE = (1)  # Target is success or not
+        self.TARGET_SHAPE = 1  # Target is success or not
 
         self.IMAGE_SIZE = np.prod(self.IMAGE_SHAPE)  # Size of each image
         self.STATE_SIZE = np.prod(self.STATE_SHAPE)  # Size of state vector
@@ -577,26 +577,13 @@ class RoboTwin(gym.Env):
             reward_venv[i] = torch.from_numpy(result["reward"]).to(self.device)
             terminated_venv[i] = torch.from_numpy(result["terminated"]).to(self.device)
             truncated_venv[i] = torch.from_numpy(result["truncated"]).to(self.device)
-            info_venv["success"].append(torch.tensor(result["is_success"]).to(self.device))
+            info_venv["success"].append(
+                torch.tensor(result["is_success"]).to(self.device)
+            )
         info_venv["success"] = torch.stack(info_venv["success"])
         obs_venv["images"] = torch.stack(obs_venv["images"]).permute(0, 1, 4, 2, 3)
         obs_venv["state"] = torch.stack(obs_venv["state"])
         return obs_venv, reward_venv, terminated_venv, truncated_venv, info_venv
-
-    def check_success(self, return_poses):
-        # return_poses has two arms with xyz poses: [1, 6]
-        return_poses = return_poses[0]
-        taget_pose = [-0.45, 0]
-        eps = np.array([0.221, 0.325])
-        for i in range(2):
-            if (
-                np.all(np.abs(return_poses[i * 3 : i * 3 + 2] - taget_pose) < eps)
-                and return_poses[i * 3 + 2] > 0.2
-                and return_poses[i * 3 + 2] < 0.7
-            ):
-                continue
-            return False
-        return True
 
     def chunk_step(self, chunk_actions):
         # chunk_actions: [num_envs, chunk_step, action_dim]
