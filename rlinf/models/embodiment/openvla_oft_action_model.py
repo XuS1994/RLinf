@@ -209,7 +209,6 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         do_sample = kwargs.pop("do_sample")
         processed_obs = None
         if env_obs is not None:
-            assert env_obs is not None
             task_descriptions = [
                 f"In: What action should the robot take to {t.lower()}?\nOut: "
                 for t in env_obs["task_descriptions"]

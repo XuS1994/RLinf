@@ -60,12 +60,12 @@ def prepare_actions_for_libero(
     raw_chunk_actions,
     model_name,
 ) -> torch.Tensor:
+    chunk_actions = raw_chunk_actions
     if model_name == "openvla" or model_name == "openvla_oft":
-        chunk_actions = raw_chunk_actions.copy()
         chunk_actions[..., -1] = 2 * chunk_actions[..., -1] - 1
         chunk_actions[..., -1] = np.sign(chunk_actions[..., -1]) * -1.0
         chunk_actions = torch.from_numpy(chunk_actions).cuda()
-    return raw_chunk_actions
+    return chunk_actions
 
 
 def prepare_actions(
