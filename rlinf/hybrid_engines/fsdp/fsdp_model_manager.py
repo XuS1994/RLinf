@@ -41,9 +41,6 @@ class FSDPModelManager:
         self.torch_dtype = torch_dtype_from_precision(
             self._cfg.model.get("precision", None)
         )
-        self.gradient_checkpointing_enable = self._cfg.model.get(
-            "gradient_checkpointing_enable", False
-        )
 
     def model_provider_func(self) -> torch.nn.Module:
         if self._cfg.model.get("gptq_model", False):

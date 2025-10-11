@@ -117,7 +117,7 @@ class MultiStepRolloutWorker(Worker):
 
         # Note: currently this is not correct for chunk-size>1 with partial reset
         if env_output["dones"].any() and self.cfg.env.train.auto_reset:
-            if self.cfg.actor.model.add_value_head:
+            if hasattr(self.hf_model, "value_head"):
                 dones = env_output["dones"]
 
                 final_obs = env_output["final_obs"]
