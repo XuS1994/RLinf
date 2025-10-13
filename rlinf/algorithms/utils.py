@@ -94,7 +94,7 @@ def preprocess_loss_inputs(**kwargs) -> dict:
         logprobs = logprobs.reshape(bsz, -1, single_action_dim)
         old_logprobs = old_logprobs.reshape(bsz, -1, single_action_dim)
 
-    elif logprob_type == "step_level":
+    elif logprob_type == "action_level":
         logprobs = logprobs.reshape(bsz, -1, single_action_dim).sum(dim=-1)
         old_logprobs = old_logprobs.reshape(bsz, -1, single_action_dim).sum(dim=-1)
 
@@ -111,7 +111,7 @@ def preprocess_loss_inputs(**kwargs) -> dict:
     returns = expand_to_target_dim(returns, target_shape)
 
     if entropy is not None:
-        if entropy_type == "step_level":
+        if entropy_type == "action_level":
             entropy = entropy.reshape(bsz, -1, single_action_dim).sum(dim=-1)
         elif entropy_type == "chunk_level":
             entropy = entropy.sum(dim=-1)
