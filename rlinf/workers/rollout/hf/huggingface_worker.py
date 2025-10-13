@@ -141,12 +141,11 @@ class MultiStepRolloutWorker(Worker):
             self.reload_model()
         self.buffer_list = [EmbodiedRolloutResult() for _ in range(self.stage_num)]
 
-        for rollout_epoch in range(self.cfg.algorithm.rollout_epoch):
-            self._logger.info(f"Now epoch is={rollout_epoch}")
-            for _ in tqdm(
-                range(self.cfg.algorithm.n_chunk_steps),
-                desc=f"Rollout ID {self._rank} Epoch {rollout_epoch} in Generate Step",
-            ):
+        for _ in tqdm(
+            range(self.cfg.algorithm.rollout_epoch),
+            desc=f"[Rank {self._rank}] Generating Rollout Epochs",
+        ):
+            for _ in range(self.cfg.algorithm.n_chunk_steps):
                 for i in range(self.stage_num):
                     env_output = await self.recv_env_output()
                     self.update_env_output(i, env_output)
@@ -175,9 +174,7 @@ class MultiStepRolloutWorker(Worker):
         if self.cfg.rollout.get("enable_offload", False):
             self.reload_model()
 
-        for _ in tqdm(
-            range(self.cfg.algorithm.n_eval_chunk_steps), desc="Rollout in Eval Step"
-        ):
+        for _ in range(self.cfg.algorithm.n_eval_chunk_steps):
             for _ in range(self.stage_num):
                 env_output = await self.recv_env_output()
                 actions, _ = self.predict(env_output["obs"], mode="eval")
