@@ -168,8 +168,7 @@ def get_model(model_path, cfg: DictConfig, override_config_kwargs=None):
         )
 
         # oft add
-        num_images_in_input = 2 if cfg.use_wrist_image else 1
-        model.vision_backbone.set_num_images_in_input(num_images_in_input)
+        model.vision_backbone.set_num_images_in_input(cfg.get("num_images_in_input", 1))
 
         model.to(torch_dtype)
 
