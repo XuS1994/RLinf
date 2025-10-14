@@ -82,44 +82,36 @@ def compute_embodied_gae_advantages_and_returns(
     # calc adv
     flattened_advantages = flattened_returns - flattened_values[:-1]
     if normalize_advantages:
-        if flattened_loss_mask is None:
-            mean_advantages = flattened_advantages.mean()
-            std_advantages = flattened_advantages.std(correction=0)
+        if flattened_loss_mask is not None:
+            flattened_advantages = flattened_advantages[flattened_loss_mask]
+        mean_advantages = flattened_advantages.mean()
+        std_advantages = flattened_advantages.std(correction=0)
+        if (
+            std_advantages < 1e-8
+            or torch.isinf(std_advantages).any()
+            or torch.isnan(std_advantages).any()
+        ):
+            flattened_advantages = torch.zeros_like(flattened_advantages)
+        else:
             flattened_advantages = (flattened_advantages - mean_advantages) / (
                 std_advantages + 1e-8
             )
-        else:
-            mean_advantages = flattened_advantages[flattened_loss_mask].mean()
-            std_advantages = flattened_advantages[flattened_loss_mask].std(correction=0)
-            if (
-                std_advantages < 1e-8
-                or torch.isinf(std_advantages).any()
-                or torch.isnan(std_advantages).any()
-            ):
-                flattened_advantages = torch.zeros_like(flattened_advantages)
-            else:
-                flattened_advantages = (flattened_advantages - mean_advantages) / (
-                    std_advantages + 1e-8
-                )
 
     if normalize_returns:
-        if flattened_loss_mask is None:
-            mean_returns = flattened_returns.mean()
-            std_retuns = flattened_returns.std(correction=0)
-            flattened_returns = (flattened_returns - mean_returns) / (std_retuns + 1e-5)
+        if flattened_loss_mask is not None:
+            flattened_returns = flattened_returns[flattened_loss_mask]
+        mean_returns = flattened_returns.mean()
+        std_retuns = flattened_returns.std(correction=0)
+        if (
+            std_retuns < 1e-8
+            or torch.isinf(std_retuns).any()
+            or torch.isnan(std_retuns).any()
+        ):
+            flattened_returns = torch.zeros_like(flattened_returns)
         else:
-            mean_returns = flattened_returns[flattened_loss_mask].mean()
-            std_retuns = flattened_returns[flattened_loss_mask].std(correction=0)
-            if (
-                std_retuns < 1e-8
-                or torch.isinf(std_retuns).any()
-                or torch.isnan(std_retuns).any()
-            ):
-                flattened_returns = torch.zeros_like(flattened_returns)
-            else:
-                flattened_returns = (flattened_returns - mean_returns) / (
-                    std_retuns + 1e-8
-                )
+            flattened_returns = (flattened_returns - mean_returns) / (
+                std_retuns + 1e-8
+            )
 
     advantages = flattened_advantages.reshape(num_chunk, chunk_size, -1).transpose(1, 2)
     returns = flattened_returns.reshape(num_chunk, chunk_size, -1).transpose(1, 2)
