@@ -1,6 +1,6 @@
 defaults:
-  - env/train: libero_goal_openpi
-  - env/eval: libero_goal_openpi
+  - env/train: libero_goal
+  - env/eval: libero_goal
   - override hydra/job_logging: stdout
 
 hydra:
@@ -39,6 +39,9 @@ algorithm:
   shuffle_samples: True
   normalize_advantages: True
   kl_penalty: kl  # how to estimate kl divergence: kl or kl_penalty
+  max_episode_steps: 320
+  use_ordered_reset_state_ids: False
+  reward_coef: 1.0
   group_size: 1
   n_chunk_steps: 64
   n_eval_chunk_steps: 64
