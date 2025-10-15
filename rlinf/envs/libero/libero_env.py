@@ -292,7 +292,7 @@ class LiberoEnv(gym.Env):
         if reconfig_env_idx:
             env_fn_params = self.get_env_fn_params(reconfig_env_idx)
             self.env.reconfigure_env_fns(env_fn_params, reconfig_env_idx)
-        self.env.seed([0] * len(env_idx))
+        self.env.seed(self.seed * len(env_idx))
         self.env.reset(id=env_idx)
         init_state = self._get_reset_states(env_idx=env_idx)
         self.env.set_init_state(init_state=init_state, id=env_idx)
