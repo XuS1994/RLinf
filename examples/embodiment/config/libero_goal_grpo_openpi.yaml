@@ -1,6 +1,6 @@
 defaults:
-  - env/train: libero_goal_openpi
-  - env/eval: libero_goal_openpi
+  - env/train: libero_goal
+  - env/eval: libero_goal
   - override hydra/job_logging: stdout
 
 hydra:
