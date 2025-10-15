@@ -1,6 +1,6 @@
 defaults:
-  - env/train: libero_spatial_openpi
-  - env/eval: libero_spatial_openpi
+  - env/train: libero_spatial
+  - env/eval: libero_spatial
   - override hydra/job_logging: stdout
 
 hydra:
