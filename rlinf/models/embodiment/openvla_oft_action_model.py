@@ -307,9 +307,7 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         logits_tensor[..., self.vocab_size :] = -torch.inf
 
         processed_logits_tensor = logits_tensor / kwargs["temperature"]
-        top_k = min(
-            kwargs["top_k"], processed_logits_tensor.size(-1)
-        )  # Safety check
+        top_k = min(kwargs["top_k"], processed_logits_tensor.size(-1))  # Safety check
         if top_k > 0:
             logits_warper = TopKLogitsWarper(
                 top_k
@@ -486,9 +484,7 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
             ]  # [B, action-dim, vocab-size]
 
             processed_logits_tensor = logits / data["temperature"]
-            top_k = min(
-                data["top_k"], processed_logits_tensor.size(-1)
-            )  # Safety check
+            top_k = min(data["top_k"], processed_logits_tensor.size(-1))  # Safety check
             if top_k > 0:
                 logits_warper = TopKLogitsWarper(
                     top_k
