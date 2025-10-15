@@ -228,10 +228,20 @@ def validate_model_cfg_by_hf_config(cfg, hf_model_path):
 def validate_fsdp_cfg(cfg: DictConfig) -> DictConfig:
     OmegaConf.set_struct(cfg, True)
     with open_dict(cfg):
-        cfg.fsdp.forward_prefetch = cfg.fsdp.get("forward_prefetch", False)
-        cfg.fsdp.limit_all_gathers = cfg.fsdp.get("limit_all_gathers", False)
-        cfg.fsdp.backward_prefetch = cfg.fsdp.get("backward_prefetch", False)
-        cfg.fsdp.use_orig_params = cfg.fsdp.get("use_orig_params", False)
+        if "fsdp_config" not in cfg:
+            cfg.fsdp_config = OmegaConf.create({})
+        cfg.fsdp_config.forward_prefetch = cfg.get("fsdp_config", {}).get(
+            "forward_prefetch", False
+        )
+        cfg.fsdp_config.limit_all_gathers = cfg.get("fsdp_config", {}).get(
+            "limit_all_gathers", False
+        )
+        cfg.fsdp_config.backward_prefetch = cfg.get("fsdp_config", {}).get(
+            "backward_prefetch", False
+        )
+        cfg.fsdp_config.use_orig_params = cfg.get("fsdp_config", {}).get(
+            "use_orig_params", False
+        )
     return cfg
 
 

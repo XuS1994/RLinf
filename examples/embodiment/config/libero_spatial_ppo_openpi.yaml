@@ -140,8 +140,6 @@ actor:
       noise_method: "flow_sde" 
       add_value_head: True
       detach_critic_input: True
-      
-    
 
   optim:
     lr: 5.0e-6
@@ -150,13 +148,6 @@ actor:
     adam_beta2: 0.95
     adam_eps: 1.0e-05
     clip_grad: 1.0
-
-  tokenizer:
-    tokenizer_type: "HuggingFaceTokenizer"
-    tokenizer_model: "/path/to/model/openpi"
-    use_fast: False
-    trust_remote_code: True
-    padding_side: "right"
 
 reward:
   use_reward_model: False

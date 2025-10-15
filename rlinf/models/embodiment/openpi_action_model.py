@@ -75,8 +75,10 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch):
         self,
         config: OpenPi0Config,
     ):
-        # pi0 base model init
+        # Override `sample_actions` to prevent parent class polymorphic call
+        sample_actions_func = self.sample_actions
         super().__init__(config)
+        self.sample_actions = sample_actions_func
 
         # rl model init
         proj_width = 1024

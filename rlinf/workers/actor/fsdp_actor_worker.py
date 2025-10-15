@@ -746,11 +746,6 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
         g.manual_seed(self.cfg.actor.seed + self._rank)
         shuffle_id = torch.randperm(rollout_size, generator=g)
 
-        for key, value in self.rollout_batch.items():
-            self.log_on_first_rank(
-                f"run training, {key}: {value.shape if value is not None else None}"
-            )
-
         with torch.no_grad():
             for key, value in self.rollout_batch.items():
                 if key in ["dones", "prev_values"]:
