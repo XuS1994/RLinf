@@ -40,6 +40,9 @@ algorithm:
   normalize_advantages: True
   kl_penalty: kl  # how to estimate kl divergence: kl or kl_penalty
   group_size: 8
+  max_episode_steps: 480
+  use_ordered_reset_state_ids: False
+  reward_coef: 1.0
   n_chunk_steps: 48
   n_eval_chunk_steps: 48
   num_group_envs: 8
