@@ -306,9 +306,9 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         logits_tensor[..., : self.vocab_size - self.config.n_action_bins] = -torch.inf
         logits_tensor[..., self.vocab_size :] = -torch.inf
 
-        processed_logits_tensor = logits_tensor / kwargs.get("temperature", 1.0)
+        processed_logits_tensor = logits_tensor / kwargs["temperature"]
         top_k = min(
-            kwargs.get("top_k", 50), processed_logits_tensor.size(-1)
+            kwargs["top_k"], processed_logits_tensor.size(-1)
         )  # Safety check
         if top_k > 0:
             logits_warper = TopKLogitsWarper(
@@ -425,6 +425,7 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         compute_logprobs: bool = False,
         compute_entropy: bool = False,
         compute_values: bool = False,
+        use_cache: Optional[bool] = None,
     ):
         if data is not None:
             data = self.preprocess_for_train(data)
@@ -470,7 +471,7 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
             past_key_values=None,
             inputs_embeds=mm_embeddings,
             labels=None,
-            use_cache=None,
+            use_cache=use_cache,
             output_attentions=False,
             output_hidden_states=output_hidden_states,
             return_dict=True,
@@ -484,9 +485,9 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
                 :, -self.action_dim * self.num_action_chunks - 1 : -1
             ]  # [B, action-dim, vocab-size]
 
-            processed_logits_tensor = logits / data.get("temperature", 1.0)
+            processed_logits_tensor = logits / data["temperature"]
             top_k = min(
-                data.get("top_k", -1), processed_logits_tensor.size(-1)
+                data["top_k"], processed_logits_tensor.size(-1)
             )  # Safety check
             if top_k > 0:
                 logits_warper = TopKLogitsWarper(

@@ -831,6 +831,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
                         compute_logprobs=True,
                         compute_entropy=True,
                         compute_values=compute_values,
+                        use_cache=False,
                     )
 
                     if self.cfg.actor.model.model_name in ["openpi"]:

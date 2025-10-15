@@ -179,10 +179,10 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch):
     def forward(
         self,
         data: dict[str, torch.Tensor],
-        compute_logprobs: bool = True,
-        compute_entropy: bool = False,
-        compute_values: bool = False,
+        **kwargs,
     ) -> Dict[str, Any]:
+        compute_values = kwargs.get("compute_values", False)
+
         chains = data["chains"]
         denoise_inds = data["denoise_inds"]
         # input transform

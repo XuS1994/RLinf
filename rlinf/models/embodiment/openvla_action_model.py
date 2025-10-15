@@ -555,9 +555,9 @@ class OpenVLAForRLActionPrediction(OpenVLAForBatchActionPrediction):
                 :, -self.action_dim * self.num_action_chunks - 1 : -1
             ]  # [B, action-dim, vocab-size]
 
-            processed_logits_tensor = logits / data.get("temperature", 1.0)
+            processed_logits_tensor = logits / data["temperature"]
             top_k = min(
-                data.get("top_k", -1), processed_logits_tensor.size(-1)
+                data["top_k"], processed_logits_tensor.size(-1)
             )  # Safety check
             if top_k > 0:
                 logits_warper = TopKLogitsWarper(
