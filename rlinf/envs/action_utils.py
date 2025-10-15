@@ -59,7 +59,7 @@ def prepare_actions_for_maniskill(
 def prepare_actions_for_libero(
     raw_chunk_actions,
     model_name,
-) -> torch.Tensor:
+) -> [torch.Tensor, np.ndarray]:
     chunk_actions = raw_chunk_actions
     if model_name == "openvla" or model_name == "openvla_oft":
         chunk_actions[..., -1] = 2 * chunk_actions[..., -1] - 1

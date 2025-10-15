@@ -91,14 +91,17 @@ def preprocess_loss_inputs(**kwargs) -> dict:
             returns = returns.flatten()
     bsz = logprobs.shape[0]
     if logprob_type == "token_level":
+        # logprobs, old_logprobs: [bsz, num_action_chunks, action_dim] -> [bsz, num_action_chunks, action_dim]
         logprobs = logprobs.reshape(bsz, -1, single_action_dim)
         old_logprobs = old_logprobs.reshape(bsz, -1, single_action_dim)
 
     elif logprob_type == "action_level":
+        # logprobs, old_logprobs: [bsz, num_action_chunks, action_dim] -> [bsz, num_action_chunks]
         logprobs = logprobs.reshape(bsz, -1, single_action_dim).sum(dim=-1)
         old_logprobs = old_logprobs.reshape(bsz, -1, single_action_dim).sum(dim=-1)
 
     elif logprob_type == "chunk_level":
+        # logprobs, old_logprobs: [bsz, num_action_chunks, action_dim] -> [bsz]
         logprobs = logprobs.reshape(bsz, -1, single_action_dim).sum(dim=[1, 2])
         old_logprobs = old_logprobs.reshape(bsz, -1, single_action_dim).sum(dim=[1, 2])
 
@@ -139,8 +142,9 @@ def preprocess_advantages_inputs(**kwargs) -> dict:
     """
     reward_type = kwargs.get("reward_type", None)
     if reward_type == "chunk_level":
+        # rewards, dones, loss_mask, loss_mask_sum: [n_chunk_steps, bsz, num_action_chunks] -> [n_chunk_steps, bsz, 1]
         kwargs["rewards"] = kwargs["rewards"].sum(dim=-1, keepdim=True)
-        kwargs["dones"] = kwargs["dones"][..., -1:]
+        kwargs["dones"] = kwargs["dones"].max(dim=-1, keepdim=True)[0]
         if "loss_mask" in kwargs and kwargs["loss_mask"] is not None:
             kwargs["loss_mask"] = kwargs["loss_mask"].max(dim=-1, keepdim=True)[0]
         if "loss_mask_sum" in kwargs and kwargs["loss_mask_sum"] is not None:

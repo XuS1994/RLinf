@@ -83,9 +83,11 @@ def compute_embodied_gae_advantages_and_returns(
     flattened_advantages = flattened_returns - flattened_values[:-1]
     if normalize_advantages:
         if flattened_loss_mask is not None:
-            flattened_advantages = flattened_advantages[flattened_loss_mask]
-        mean_advantages = flattened_advantages.mean()
-        std_advantages = flattened_advantages.std(correction=0)
+            mean_advantages = flattened_advantages[flattened_loss_mask].mean()
+            std_advantages = flattened_advantages[flattened_loss_mask].std(correction=0)
+        else:
+            mean_advantages = flattened_advantages.mean()
+            std_advantages = flattened_advantages.std(correction=0)
         if (
             std_advantages < 1e-8
             or torch.isinf(std_advantages).any()
@@ -99,9 +101,11 @@ def compute_embodied_gae_advantages_and_returns(
 
     if normalize_returns:
         if flattened_loss_mask is not None:
-            flattened_returns = flattened_returns[flattened_loss_mask]
-        mean_returns = flattened_returns.mean()
-        std_retuns = flattened_returns.std(correction=0)
+            mean_returns = flattened_returns[flattened_loss_mask].mean()
+            std_retuns = flattened_returns[flattened_loss_mask].std(correction=0)
+        else:
+            mean_returns = flattened_returns.mean()
+            std_retuns = flattened_returns.std(correction=0)
         if (
             std_retuns < 1e-8
             or torch.isinf(std_retuns).any()
