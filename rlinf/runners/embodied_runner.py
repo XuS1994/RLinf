@@ -97,7 +97,7 @@ class EmbodiedRunner:
             initial=start_step,
             total=self.max_steps,
             desc="Global Step",
-            ncols=620,
+            ncols=700,
         )
         for _step in range(start_step, self.max_steps):
             # set global step

@@ -881,6 +881,7 @@ actor
       lora_rank: 32
       lora_path: /storage/models/oft-sft/lora_004000
       ckpt_path: null
+      num_images_in_input: 1
       use_wrist_image: False
       attn_implementation: "flash_attention_2"
       low_cpu_mem_usage: True
@@ -956,6 +957,8 @@ actor
 ``actor.model.lora_path``: Path to LoRA weights.
 
 ``actor.model.ckpt_path``: Path to model checkpoint.
+
+``actor.model.num_images_in_input``: Number of images in model input.
 
 ``actor.model.use_wrist_image``: Whether to use wrist image in model input.
 

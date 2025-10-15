@@ -879,7 +879,7 @@ class EmbodiedRolloutResult:
     dones: List[torch.Tensor] = field(default_factory=list)
     rewards: List[torch.Tensor] = field(default_factory=list)
 
-    inputs_data: List[Dict[str, Any]] = field(default_factory=list)
+    forward_inputs: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self):
         self.prev_logprobs = (
@@ -903,8 +903,8 @@ class EmbodiedRolloutResult:
             else []
         )
 
-        self.inputs_data = [
-            put_tensor_cpu(inputs_data) for inputs_data in self.inputs_data
+        self.forward_inputs = [
+            put_tensor_cpu(forward_inputs) for forward_inputs in self.forward_inputs
         ]
 
     def append_result(self, result: Dict[str, Any]):
@@ -921,7 +921,7 @@ class EmbodiedRolloutResult:
             result["rewards"].cpu().contiguous()
         ) if "rewards" in result else []
 
-        self.inputs_data.append(put_tensor_cpu(result["inputs_data"]))
+        self.forward_inputs.append(put_tensor_cpu(result["forward_inputs"]))
 
     def to_dict(self):
         rollout_result_dict = {}
@@ -945,17 +945,17 @@ class EmbodiedRolloutResult:
             if len(self.rewards) > 0
             else None
         )
-        merged_inputs_data = {}
-        for data in self.inputs_data:
+        merged_forward_inputs = {}
+        for data in self.forward_inputs:
             for k, v in data.items():
-                if k in merged_inputs_data:
-                    merged_inputs_data[k].append(v)
+                if k in merged_forward_inputs:
+                    merged_forward_inputs[k].append(v)
                 else:
-                    merged_inputs_data[k] = [v]
-        for k in merged_inputs_data.keys():
+                    merged_forward_inputs[k] = [v]
+        for k in merged_forward_inputs.keys():
             assert k not in ["dones", "rewards", "prev_logprobs", "prev_values"]
             rollout_result_dict[k] = (
-                torch.stack(merged_inputs_data[k], dim=0).cpu().contiguous()
+                torch.stack(merged_forward_inputs[k], dim=0).cpu().contiguous()
             )
 
         return rollout_result_dict

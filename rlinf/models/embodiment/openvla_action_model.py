@@ -609,7 +609,6 @@ class OpenVLAForRLActionPrediction(OpenVLAForBatchActionPrediction):
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         do_sample = kwargs.pop("do_sample")
 
-        processed_obs = None
         if env_obs is not None:
             task_descriptions = [
                 f"In: What action should the robot take to {t.lower()}?\nOut: "
@@ -637,6 +636,12 @@ class OpenVLAForRLActionPrediction(OpenVLAForBatchActionPrediction):
             pixel_values = processed_obs["pixel_values"].to(
                 device=device, dtype=precision
             )
+
+        forward_inputs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "pixel_values": pixel_values,
+        }
 
         # assert first token is 1
         assert torch.all(input_ids[:, 0] == 1)
@@ -727,13 +732,12 @@ class OpenVLAForRLActionPrediction(OpenVLAForBatchActionPrediction):
             -1, self.num_action_chunks, self.action_dim
         )
 
-        inputs_data = processed_obs
-        inputs_data["action_tokens"] = chunk_action_tokens
+        forward_inputs["action_tokens"] = chunk_action_tokens
 
         result = {
             "prev_logprobs": chunk_logprobs,
             "prev_values": chunk_values,
-            "inputs_data": inputs_data,
+            "forward_inputs": forward_inputs,
         }
 
         return chunk_actions, result
