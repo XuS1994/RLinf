@@ -22,7 +22,6 @@ import torch
 from omegaconf import DictConfig
 from torch.distributed.device_mesh import init_device_mesh
 from torch.multiprocessing.reductions import reduce_tensor
-from tqdm import tqdm
 
 import rlinf.algorithms  # noqa: F401
 from rlinf.algorithms.registry import actor_loss, calculate_adv_and_returns
@@ -817,7 +816,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
                     loss_mask = data.get("loss_mask", None)
                     loss_mask_sum = data.get("loss_mask_sum", None)
 
-                    if self.cfg.actor.model.model_name in ["openpi", "openvla"]:
+                    if self.cfg.actor.model.model_name in ["openvla", "openvla_oft"]:
                         data["temperature"] = (
                             self.cfg.algorithm.sampling_params.temperature_train
                         )

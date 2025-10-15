@@ -120,8 +120,16 @@ class FSDPModelManager:
             sharding_strategy = ShardingStrategy.SHARD_GRAD_OP
         else:
             sharding_strategy = ShardingStrategy.NO_SHARD
+
+        is_vla_model = (
+            True if self._cfg.model.model_name in ["openvla", "openvla_oft"] else False
+        )
+
         auto_wrap_policy = get_fsdp_wrap_policy(
-            module=module, config=None, is_lora=self._cfg.model.is_lora
+            module=module,
+            config=None,
+            is_lora=self._cfg.model.is_lora,
+            is_vla_model=is_vla_model,
         )
 
         betas = (self._cfg.optim.adam_beta1, self._cfg.optim.adam_beta2)

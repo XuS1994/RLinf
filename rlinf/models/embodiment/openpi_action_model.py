@@ -24,9 +24,9 @@ from openpi import transforms as _transforms
 from openpi.models import model as _model
 from openpi.models.pi0_config import Pi0Config
 from openpi.models_pytorch.pi0_pytorch import PI0Pytorch, make_att_2d_masks
+
 from rlinf.models.embodiment.modules.explore_noise_net import ExploreNoiseNet
 from rlinf.models.embodiment.modules.value_head import ValueHead
-
 
 
 @dataclass(frozen=True)
@@ -183,7 +183,6 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch):
         compute_entropy: bool = False,
         compute_values: bool = False,
     ) -> Dict[str, Any]:
-
         chains = data["chains"]
         denoise_inds = data["denoise_inds"]
         # input transform
@@ -271,7 +270,7 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch):
             {"actions": outputs["actions"], "state": observation.state}
         )["actions"].numpy()
 
-        inputs_data = {
+        forward_inputs = {
             "chains": outputs["chains"],
             "denoise_inds": outputs["denoise_inds"],
             "observation/image": env_obs["images"],
@@ -284,7 +283,7 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch):
         result = {
             "prev_logprobs": outputs["prev_logprobs"],
             "prev_values": outputs["prev_values"],
-            "inputs_data": inputs_data,
+            "forward_inputs": forward_inputs,
         }
 
         return actions, result
@@ -649,4 +648,3 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch):
             self.paligemma_with_expert.paligemma.eval()
             for params in self.paligemma_with_expert.paligemma.parameters():
                 params.requires_grad = False
-

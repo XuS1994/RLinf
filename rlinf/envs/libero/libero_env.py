@@ -178,13 +178,7 @@ class LiberoEnv(gym.Env):
                     trial_ids.append(reset_state_id - start_pivot)
                     break
                 start_pivot = end_pivot
-        print(
-            "get task and trial id",
-            self.cumsum_trial_id_bins,
-            reset_state_ids,
-            task_ids,
-            trial_ids,
-        )
+
         return np.array(task_ids), np.array(trial_ids)
 
     def _get_reset_states(self, env_idx):
@@ -298,7 +292,7 @@ class LiberoEnv(gym.Env):
         if reconfig_env_idx:
             env_fn_params = self.get_env_fn_params(reconfig_env_idx)
             self.env.reconfigure_env_fns(env_fn_params, reconfig_env_idx)
-        self.env.seed(self.seed)
+        self.env.seed([0] * len(env_idx))
         self.env.reset(id=env_idx)
         init_state = self._get_reset_states(env_idx=env_idx)
         self.env.set_init_state(init_state=init_state, id=env_idx)

@@ -113,9 +113,7 @@ def compute_embodied_gae_advantages_and_returns(
         ):
             flattened_returns = torch.zeros_like(flattened_returns)
         else:
-            flattened_returns = (flattened_returns - mean_returns) / (
-                std_retuns + 1e-8
-            )
+            flattened_returns = (flattened_returns - mean_returns) / (std_retuns + 1e-8)
 
     advantages = flattened_advantages.reshape(num_chunk, chunk_size, -1).transpose(1, 2)
     returns = flattened_returns.reshape(num_chunk, chunk_size, -1).transpose(1, 2)

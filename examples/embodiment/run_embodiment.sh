@@ -7,8 +7,9 @@ export SRC_FILE="${EMBODIED_PATH}/train_embodied_agent.py"
 export MUJOCO_GL="egl"
 export PYOPENGL_PLATFORM="egl"
 export PYTHONPATH=${REPO_PATH}:$PYTHONPATH
+
 # NOTE: set LIBERO_REPO_PATH to the path of the LIBERO repo
-LIBERO_PATH=/opt/libero
+export LIBERO_REPO_PATH="/opt/libero"
 
 # NOTE: set OPENPI_REPO_PATH to the path of the openpi repo
 export OPENPI_REPO_PATH="/path/to/repo/openpi"

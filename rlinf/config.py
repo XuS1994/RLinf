@@ -539,7 +539,7 @@ def validate_embodied_cfg(cfg):
             cfg.env.eval.init_params.control_mode = get_robot_control_mode(
                 cfg.actor.model.policy_setup
             )
-        if cfg.env.train.simulator_type == "":
+        if cfg.env.train.simulator_type == "libero":
             if cfg.actor.model.get("num_images_in_input", 1) > 1:
                 assert cfg.actor.model.get("use_wrist_image", False), (
                     "Invalid config: Multiple input images are enabled "

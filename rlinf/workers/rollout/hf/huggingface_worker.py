@@ -143,7 +143,8 @@ class MultiStepRolloutWorker(Worker):
 
         for _ in tqdm(
             range(self.cfg.algorithm.rollout_epoch),
-            desc=f"[Rank {self._rank}] Generating Rollout Epochs",
+            desc="Generating Rollout Epochs",
+            disable=(self._rank != 0),
         ):
             for _ in range(self.cfg.algorithm.n_chunk_steps):
                 for i in range(self.stage_num):
