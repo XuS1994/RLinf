@@ -122,7 +122,9 @@ class FSDPModelManager:
             sharding_strategy = ShardingStrategy.NO_SHARD
 
         is_vla_model = (
-            True if self._cfg.model.model_name in ["openvla", "openvla_oft"] else False
+            True
+            if self._cfg.model.get("model_name", None) in ["openvla", "openvla_oft"]
+            else False
         )
 
         auto_wrap_policy = get_fsdp_wrap_policy(
