@@ -271,6 +271,8 @@ def get_model(model_path, cfg: DictConfig, override_config_kwargs=None):
             modality_transform=modality_transform,
             denoising_steps=cfg.denoising_steps,
             action_horizon=cfg.num_action_chunks,
+            tune_visual=False,
+            tune_llm=False,
         )
         model.to(torch_dtype)
 
