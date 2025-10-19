@@ -248,7 +248,7 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         assert torch.all(input_ids[:, 0] == 1)
         assert torch.all(attention_mask[:, 0] == 1)
         # last token is space ` `
-        assert torch.all(input_ids[:, -1] == 29871)
+        assert torch.all(input_ids[:, -1] == 29871), f"input_ids[:, -1]: {input_ids[:, -1]}, input_ids.shape: {input_ids.shape}"
         assert torch.all(attention_mask[:, -1] == 1)
 
         n_prompt_tokens = input_ids.shape[-1] - 1
@@ -354,7 +354,8 @@ class OpenVLAOFTForRLActionPrediction(OpenVLAOFTForActionPrediction):
         normalized_actions = normalized_actions.reshape(-1, self.action_dim)
 
         # Unnormalize predicted actions
-        actions = self._unnormalize_actions(normalized_actions, self.unnorm_key)
+        # actions = self._unnormalize_actions(normalized_actions, self.unnorm_key)
+        actions = normalized_actions
         actions = actions.reshape(idxs.shape)
 
         action_logits = processed_logits_tensor.permute(

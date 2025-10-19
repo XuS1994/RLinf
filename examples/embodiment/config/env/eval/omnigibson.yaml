@@ -1,0 +1,57 @@
+simulator_type: omnigibson
+auto_reset: False
+ignore_terminations: False
+use_rel_reward: True
+seed: 0
+num_group: ${env.eval.num_envs}
+group_size: 1
+use_fixed_reset_state_ids: True
+num_envs: 1
+only_eval: True
+image_size: [224, 224]
+max_steps: 80
+
+video_cfg:
+  save_video: True
+  info_on_video: True
+  video_base_dir: ${runner.logger.log_path}/video/eval
+
+init_params:
+  id: "PutCarrotOnPlateInScene-v2"
+  num_envs: ${env.eval.num_envs}
+  obs_mode: ${env.train.init_params.obs_mode}
+  control_mode: None
+  sim_backend: "gpu"
+  sim_config: ${env.train.init_params.sim_config}
+  max_episode_steps: ${env.train.init_params.max_episode_steps}
+  sensor_configs: ${env.train.init_params.sensor_configs}
+  render_mode: null
+  task_type: ${env.train.init_params.task_type}
+env_wrapper: 
+  _target_: omnigibson.learning.wrappers.RGBLowResWrapper
+robot:
+  type: R1Pro
+  # multi_view_cameras are used by BehaviorIterableDataset
+  multi_view_cameras:
+    left_wrist: 
+      name: robot_r1::robot_r1:left_realsense_link:Camera:0
+      resolution: [240, 240]
+    right_wrist: 
+      name: robot_r1::robot_r1:right_realsense_link:Camera:0
+      resolution: [240, 240]
+    head: 
+      name: robot_r1::robot_r1:zed_link:Camera:0
+      resolution: [240, 240]
+  # action_keys and action_key_dims are used by the baselines in il_lib repo 
+  # You don't need to modify this if you are not training il_lib baselines
+  action_keys: [base, torso, left_arm, left_gripper, right_arm, right_gripper]
+  action_key_dims:
+    base: 3
+    torso: 4
+    left_arm: 7
+    left_gripper: 1
+    right_arm: 7
+    right_gripper: 1
+
+  # Overwrite below to modify the robot controller 
+  controllers:

@@ -1058,6 +1058,13 @@ class EnvOutput:
             image_tensor = obs["images"]
         elif self.simulator_type == "robotwin":
             image_tensor = obs["images"]
+        elif self.simulator_type == "omnigibson":
+            images_tensor = []
+            for key, value in obs.items():
+                if "rgb" in key:
+                    images_tensor.append(value[:,:,0:3].clone().permute(2, 0, 1).unsqueeze(0))
+            image_tensor = torch.stack(images_tensor, dim=1)
+            # final image_tensor shape is [chunk_size, num_images, C, H, W], eg: torch.Size([1, 3, 3, 224, 224])
         else:
             raise NotImplementedError
 
