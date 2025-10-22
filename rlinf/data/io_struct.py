@@ -15,7 +15,6 @@
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
-import cv2
 import torch
 from omegaconf import DictConfig
 
@@ -1060,14 +1059,8 @@ class EnvOutput:
         elif self.simulator_type == "robotwin":
             image_tensor = obs["images"]
         elif self.simulator_type == "omnigibson":
-            images_tensor = []
-            for key, value in obs.items():
-                if "rgb" in key:
-                    resize_image = cv2.resize(value.numpy(), (224, 224))
-                    resize_image = torch.from_numpy(resize_image).clone()[:,:,0:3].permute(2, 0, 1).unsqueeze(0) / 255.0
-                    images_tensor.append(resize_image)
-            image_tensor = torch.stack(images_tensor, dim=1)
-            # final image_tensor shape is [chunk_size, num_images, C, H, W], eg: torch.Size([1, 3, 3, 224, 224])
+            image_tensor = obs["images"]
+            wrist_image_tensor = obs["wrist_images"]
         else:
             raise NotImplementedError
 
@@ -1075,14 +1068,9 @@ class EnvOutput:
         if "images_and_states" in obs and "state" in obs["images_and_states"]:
             states = obs["images_and_states"]["state"]
 
-        if "task_descriptions" in obs:
-            task_descriptions = (
-                list(obs["task_descriptions"])
-            )
-        else: # TODO load from bahvior json
-            task_descriptions = (
-                list(["Turn on the radio receiver that's on the table in the living room."])
-            )
+        task_descriptions = (
+            list(obs["task_descriptions"]) if "task_descriptions" in obs else None
+        )
 
         return {
             "images": image_tensor,

@@ -13,76 +13,37 @@
 # limitations under the License.
 
 # Standard library imports
-from av.container import Container
-from av.stream import Stream
 import json
-import logging
-import os
-import sys
-import traceback
-from inspect import getsourcefile
-from pathlib import Path
-from signal import signal, SIGINT
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Tuple
 
 # Third-party imports
 import cv2
 import gymnasium as gym
 import numpy as np
-import omnigibson as og
-import omnigibson.utils.transform_utils as T
-import torch
-from hydra.utils import instantiate
-from omegaconf import DictConfig, OmegaConf
-from pyvirtualdisplay import Display
 
 # OmniGibson imports
-from omnigibson.envs.env_wrapper import EnvironmentWrapper
-from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
+import torch
+from av.container import Container
+from av.stream import Stream
+from omegaconf import OmegaConf, open_dict
+from omnigibson.macros import gm
+from omnigibson.envs import VectorEnvironment
 from omnigibson.learning.utils.eval_utils import (
     ROBOT_CAMERA_NAMES,
-    PROPRIOCEPTION_INDICES,
-    generate_basic_environment_config,
-    flatten_obs_dict,
-    TASK_NAMES_TO_INDICES,
+    TASK_INDICES_TO_NAMES,
 )
 from omnigibson.learning.utils.obs_utils import (
     create_video_writer,
     write_video,
 )
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.metrics import MetricBase, AgentMetric, TaskMetric
-from omnigibson.robots import BaseRobot
-from omnigibson.utils.asset_utils import get_task_instance_path
-from omnigibson.utils.python_utils import recursively_convert_to_torch
-
-# Gello imports
-from gello.robots.sim_robot.og_teleop_utils import (
-    augment_rooms,
-    load_available_tasks,
-    generate_robot_config,
-    get_task_relevant_room_types,
-)
-from gello.robots.sim_robot.og_teleop_cfg import DISABLED_TRANSITION_RULES
-
-m = create_module_macros(module_path="/mnt/mnt/public/xusi/BEHAVIOR-1K/OmniGibson/omnigibson")
-m.NUM_EVAL_EPISODES = 1
-m.NUM_TRAIN_INSTANCES = 200
-m.NUM_EVAL_INSTANCES = 10
-
-
-# set global variables to boost performance
-gm.ENABLE_FLATCACHE = True
+# Make sure object states are enabled
+gm.HEADLESS = True
+gm.ENABLE_OBJECT_STATES = True
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
 
-# create module logger
-logger = logging.getLogger("evaluator")
-logger.setLevel(20)  # info
-
-
-display = Display(visible=0, size=(1024,768))
-display.start()
+from rlinf.envs.libero.utils import list_of_dict_to_dict_of_list, to_tensor
+from rlinf.utils.logging import get_logger
 
 __all__ = ["OmnigibsonEnv"]
 
@@ -90,14 +51,15 @@ __all__ = ["OmnigibsonEnv"]
 class OmnigibsonEnv(gym.Env):
     def __init__(self, cfg, seed_offset, total_num_processes, record_metrics=True):
         self.cfg = cfg
+        self.ignore_terminations = cfg.ignore_terminations
         self.seed_offset = seed_offset
         self.total_num_processes = total_num_processes
         self.record_metrics = record_metrics
         self._is_start = True
-        self.info_logging_keys = ["is_src_obj_grasped", "consecutive_grasp", "success"]
-        self.env_args = OmegaConf.to_container(cfg.init_params, resolve=True)
-        self.action_dim = 23
-        self.auto_reset = True
+
+        self.logger = get_logger()
+
+        self.auto_reset = cfg.auto_reset
         if self.record_metrics:
             self._init_metrics()
 
@@ -105,15 +67,10 @@ class OmnigibsonEnv(gym.Env):
         self.n_trials = 0
         self.n_success_trials = 0
         self.total_time = 0
-        self.robot_action = dict()
 
-        self.env = self.load_env(env_wrapper=self.cfg.env_wrapper)
-        self.robot = self.load_robot()
-        self.metrics = self.load_metrics()
+        self._init_env()
 
-        self.reset()
         # manually reset environment episode number
-        self.env._current_episode = 0
         self._video_writer = None
         if self.cfg.video_cfg.save_video:
             video_name = "/mnt/mnt/public/xusi/RLinf-fork-xusi/video/eval/test.mp4"
@@ -122,132 +79,88 @@ class OmnigibsonEnv(gym.Env):
                 resolution=(448, 672),
             )
 
-    def load_env(self, env_wrapper: DictConfig) -> EnvironmentWrapper:
-        """
-        Read the environment config file and create the environment.
-        The config file is located in the configs/envs directory.
-        """
-        # Disable a subset of transition rules for data collection
-        for rule in DISABLED_TRANSITION_RULES:
-            rule.ENABLED = False
-        # Load config file
-        available_tasks = load_available_tasks()
-        task_name = self.cfg.init_params.task_type
-        assert task_name in available_tasks, f"Got invalid task name: {task_name}"
-        # Now, get human stats of the task
-        task_idx = TASK_NAMES_TO_INDICES[task_name]
-        self.human_stats = {
-            "length": [],
-            "distance_traveled": [],
-            "left_eef_displacement": [],
-            "right_eef_displacement": [],
+    def _load_tasks_cfg(self):
+        with open_dict(self.cfg):
+            self.cfg.omnigibson_cfg["task"]["activity_name"] = TASK_INDICES_TO_NAMES[self.cfg.tasks.task_idx]
+
+        with open(self.cfg.tasks.task_description_path, "r") as f:
+            text = f.read()
+            task_description = [json.loads(x) for x in text.strip().split("\n") if x]
+        task_description_map = {
+            task_description[i]["task_name"]: task_description[i]["task"]
+            for i in range(len(task_description))
         }
-        with open(os.path.join(gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "episodes.jsonl"), "r") as f:
-            episodes = [json.loads(line) for line in f]
-        for episode in episodes:
-            if episode["episode_index"] // 1e4 == task_idx:
-                for k in self.human_stats.keys():
-                    self.human_stats[k].append(episode[k])
-        # take a mean
-        for k in self.human_stats.keys():
-            self.human_stats[k] = sum(self.human_stats[k]) / len(self.human_stats[k])
+        self.task_description = task_description_map[self.cfg.omnigibson_cfg["task"]["activity_name"]]
 
-        # Load the seed instance by default
-        task_cfg = available_tasks[task_name][0]
-        robot_type = "R1Pro"
-        assert robot_type == "R1Pro", f"Got invalid robot type: {robot_type}, only R1Pro is supported."
-        cfg = generate_basic_environment_config(task_name=task_name, task_cfg=task_cfg)
-        # if self.cfg.partial_scene_load:
-        #     relevant_rooms = get_task_relevant_room_types(activity_name=task_name)
-        #     relevant_rooms = augment_rooms(relevant_rooms, task_cfg["scene_model"], task_name)
-        #     cfg["scene"]["load_room_types"] = relevant_rooms
+    def _init_env(self):
+        self._load_tasks_cfg()
+        self.env = VectorEnvironment(self.cfg.num_envs, OmegaConf.to_container(self.cfg.omnigibson_cfg, resolve=True))
 
-        cfg["robots"] = [
-            generate_robot_config(
-                task_name=task_name,
-                task_cfg=task_cfg,
-            )
-        ]
-        # Update observation modalities
-        cfg["robots"][0]["obs_modalities"] = ["proprio", "rgb"]
-        cfg["robots"][0]["proprio_obs"] = list(PROPRIOCEPTION_INDICES["R1Pro"].keys())
-        if self.cfg.robot.controllers is not None:
-            cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
-        if self.cfg.max_steps is None:
-            logger.info(
-                f"Setting timeout to be 2x the average length of human demos: {int(self.human_stats['length'] * 2)}"
-            )
-            cfg["task"]["termination_config"]["max_steps"] = int(self.human_stats["length"] * 2)
-        else:
-            logger.info(f"Setting timeout to be {self.cfg.max_steps} steps through config.")
-            cfg["task"]["termination_config"]["max_steps"] = self.cfg.max_steps
-        cfg["task"]["include_obs"] = False
-        env = og.Environment(configs=cfg)
-        # instantiate env wrapper
-        env = instantiate(env_wrapper, env=env)
-        return env
+    def _extract_obs_image(self, raw_obs):
+        for _, sensor_data in raw_obs.items():
+            assert isinstance(sensor_data, dict)
+            for k, v in sensor_data.items():
+                if "left_realsense_link:Camera:0" in k:
+                    left_image = v["rgb"].to(torch.uint8)[..., :3].permute(2, 0, 1) / 255.0 # [H, W, C] -> [C, H, W]
+                elif "right_realsense_link:Camera:0" in k:
+                    right_image = v["rgb"].to(torch.uint8)[..., :3].permute(2, 0, 1) / 255.0 # [H, W, C] -> [C, H, W]
+                elif "zed_link:Camera:0" in k:
+                    zed_image = v["rgb"].to(torch.uint8)[..., :3].permute(2, 0, 1) / 255.0 # [H, W, C] -> [C, H, W]
 
-    def load_robot(self) -> BaseRobot:
-        """
-        Loads and returns the robot instance from the environment.
-        Returns:
-            BaseRobot: The robot instance loaded from the environment.
-        """
-        robot = self.env.scene.object_registry("name", "robot_r1")
-        return robot
+        return {
+            "images": zed_image, # [C, H, W]
+            "wrist_images": torch.stack([left_image, right_image], axis=0), # [N_IMG, C, H, W]
+        }
 
-    def load_metrics(self) -> List[MetricBase]:
-        """
-        Load agent and task metrics.
-        """
-        return [AgentMetric(self.human_stats), TaskMetric(self.human_stats)]
+    def _wrap_obs(self, obs_list):
+        extracted_obs_list = []
+        for obs in obs_list:
+            extracted_obs = self._extract_obs_image(obs)
+            extracted_obs_list.append(extracted_obs)
 
-    def step(self, actions=None, auto_reset=False) -> Tuple[dict, torch.Tensor, torch.Tensor, torch.Tensor, dict]:
-        """
-        Performs a single step of the task by executing the policy, interacting with the environment,
-        processing observations, updating metrics, and tracking trial success.
+        obs = {
+            "images": torch.stack([obs["images"] for obs in extracted_obs_list], axis=0), # [N_ENV, C, H, W]
+            "wrist_images": torch.stack([obs["wrist_images"] for obs in extracted_obs_list], axis=0), # [N_ENV, N_IMG, C, H, W]
+            "task_descriptions": [
+                self.task_description for i in range(self.cfg.num_envs)
+            ],
+        }
+        return obs
 
-        Returns:
-            Tuple[dict, torch.Tensor, torch.Tensor, torch.Tensor, dict]:
-                - extracted_obs (dict): The preprocessed observation dictionary.
-                - step_reward (torch.Tensor): The reward for this step.
-                - terminations (torch.Tensor): Whether the episode has terminated.
-                - truncations (torch.Tensor): Whether the episode was truncated.
-                - infos (dict): Additional information about the step.
+    def reset(self):
+        raw_obs, infos = self.env.reset()
+        obs = self._wrap_obs(raw_obs)
+        rewards = torch.zeros(self.cfg.num_envs, dtype=bool)
+        infos = self._record_metrics(rewards, infos)
+        self._reset_metrics()
+        return obs, infos
 
-        Workflow:
-            1. Steps the environment with the provided actions and retrieves the next observation,
-               termination and truncation flags, and additional info.
-            2. If the episode has ended (terminated or truncated), increments the trial counter and
-               updates the count of successful trials if the task was completed successfully.
-            3. Preprocesses the new observation.
-            4. Records metrics and returns the processed results.
-        """
-        if actions is None:
-            assert self._is_start, "Actions must be provided after the first reset."
-        if self.is_start:
-            actions = np.zeros([self.num_envs, self.action_dim])
-            self._is_start = False
+    def step(
+        self, actions=None
+    ) -> Tuple[dict, torch.Tensor, torch.Tensor, torch.Tensor, dict]:
+        raw_obs, rewards, terminations, truncations, infos = self.env.step(actions)
+        obs = self._wrap_obs(raw_obs)
 
-        raw_obs, step_reward, terminations, truncations, infos = self.env.step(actions, n_render_iterations=1)
-        # process obs
-        extracted_obs = self._preprocess_obs(raw_obs)
+        # if self.video_cfg.save_video:
+        #     plot_infos = {
+        #         "rewards": step_reward,
+        #         "terminations": terminations,
+        #         "task": self.task_descriptions,
+        #     }
+        #     self.add_new_frames(raw_obs, plot_infos)
+        infos = self._record_metrics(rewards, infos)
+        if self.ignore_terminations:
+            terminations[:] = False
+        if self.video_cfg.save_video:
+            self._write_video()
 
-        if isinstance(step_reward, float):
-            step_reward = torch.tensor([step_reward], device=self.device)
-        if isinstance(terminations, bool):
-            terminations = torch.tensor([terminations], device=self.device)
-        if isinstance(truncations, bool):
-            truncations = torch.tensor([truncations], device=self.device)
-
-        if terminations or truncations:
-            self.n_trials += 1
-            if infos["done"]["success"]:
-                self.n_success_trials += 1
-
-        infos = self._record_metrics(step_reward, infos)
-        self._write_video()
-        return extracted_obs, step_reward, terminations, truncations, infos
+        return (
+            obs,
+            to_tensor(rewards),
+            to_tensor(terminations),
+            to_tensor(truncations),
+            infos,
+        )
 
     def chunk_step(self, chunk_actions):
         # chunk_actions: [num_envs, chunk_step, action_dim]
@@ -255,14 +168,12 @@ class OmnigibsonEnv(gym.Env):
         chunk_rewards = []
         raw_chunk_terminations = []
         raw_chunk_truncations = []
-        
         for i in range(chunk_size):
             actions = chunk_actions[:, i]
-            extracted_obs, step_reward, terminations, truncations, infos = self.step(
-                actions, auto_reset=False
+            extracted_obs, step_rewards, terminations, truncations, infos = self.step(
+                actions
             )
-
-            chunk_rewards.append(step_reward)
+            chunk_rewards.append(step_rewards)
             raw_chunk_terminations.append(terminations)
             raw_chunk_truncations.append(truncations)
 
@@ -276,6 +187,7 @@ class OmnigibsonEnv(gym.Env):
 
         past_terminations = raw_chunk_terminations.any(dim=1)
         past_truncations = raw_chunk_truncations.any(dim=1)
+
         past_dones = torch.logical_or(past_terminations, past_truncations)
 
         if past_dones.any() and self.auto_reset:
@@ -297,16 +209,12 @@ class OmnigibsonEnv(gym.Env):
         )
 
     @property
-    def num_envs(self):
-        return self.env_args["num_envs"]
-
-    @property
     def device(self):
         return "cuda:0"
 
     @property
     def elapsed_steps(self):
-        return torch.tensor([self.env_args["max_episode_steps"]], device=self.device)
+        return torch.tensor(self.cfg.max_episode_steps)
 
     @property
     def is_start(self):
@@ -315,15 +223,6 @@ class OmnigibsonEnv(gym.Env):
     @is_start.setter
     def is_start(self, value):
         self._is_start = value
-
-    def init_reset_state_ids(self):
-        self._generator = torch.Generator()
-        self._generator.manual_seed(self.seed)
-        self.update_reset_state_ids()
-
-    def update_reset_state_ids(self):
-        # TODO update env here
-        pass
 
     @property
     def video_writer(self) -> Tuple[Container, Stream]:
@@ -342,80 +241,6 @@ class OmnigibsonEnv(gym.Env):
             # Close the container
             container.close()
         self._video_writer = video_writer
-
-    def load_task_instance(self, instance_id: int) -> None:
-        """
-        Loads the configuration for a specific task instance.
-
-        Args:
-            instance_id (int): The ID of the task instance to load.
-        """
-        scene_model = self.env.task.scene_name
-        tro_filename = self.env.task.get_cached_activity_scene_filename(
-            scene_model=scene_model,
-            activity_name=self.env.task.activity_name,
-            activity_definition_id=self.env.task.activity_definition_id,
-            activity_instance_id=instance_id,
-        )
-        tro_file_path = os.path.join(
-            get_task_instance_path(scene_model),
-            f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
-        )
-        with open(tro_file_path, "r") as f:
-            tro_state = recursively_convert_to_torch(json.load(f))
-        for tro_key, tro_state in tro_state.items():
-            if tro_key == "robot_poses":
-                presampled_robot_poses = tro_state
-                robot_pos = presampled_robot_poses[self.robot.model_name][0]["position"]
-                robot_quat = presampled_robot_poses[self.robot.model_name][0]["orientation"]
-                self.robot.set_position_orientation(robot_pos, robot_quat)
-                # Write robot poses to scene metadata
-                self.env.scene.write_task_metadata(key=tro_key, data=tro_state)
-            else:
-                self.env.task.object_scope[tro_key].load_state(tro_state, serialized=False)
-
-        # Try to ensure that all task-relevant objects are stable
-        # They should already be stable from the sampled instance, but there is some issue where loading the state
-        # causes some jitter (maybe for small mass / thin objects?)
-        for _ in range(25):
-            og.sim.step_physics()
-            for entity in self.env.task.object_scope.values():
-                if not entity.is_system and entity.exists:
-                    entity.keep_still()
-
-        self.env.scene.update_initial_file()
-        self.env.scene.reset()
-
-    def _preprocess_obs(self, obs: dict) -> dict:
-        """
-        Preprocess the observation dictionary before passing it to the policy.
-        Args:
-            obs (dict): The observation dictionary to preprocess.
-
-        Returns:
-            dict: The preprocessed observation dictionary.
-        """
-        obs = flatten_obs_dict(obs)
-        base_pose = self.robot.get_position_orientation()
-        cam_rel_poses = []
-        # The first time we query for camera parameters, it will return all zeros
-        # For this case, we use camera.get_position_orientation() instead.
-        # The reason we are not using camera.get_position_orientation() by defualt is because it will always return the most recent camera poses
-        # However, since og render is somewhat "async", it takes >= 3 render calls per step to actually get the up-to-date camera renderings
-        # Since we are using n_render_iterations=1 for speed concern, we need the correct corresponding camera poses instead of the most update-to-date one.
-        # Thus, we use camera parameters which are guaranteed to be in sync with the visual observations.
-        for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
-            camera = self.robot.sensors[camera_name.split("::")[1]]
-            direct_cam_pose = camera.camera_parameters["cameraViewTransform"]
-            if np.allclose(direct_cam_pose, np.zeros(16)):
-                cam_rel_poses.append(
-                    torch.cat(T.relative_pose_transform(*(camera.get_position_orientation()), *base_pose))
-                )
-            else:
-                cam_pose = T.mat2pose(torch.tensor(np.linalg.inv(np.reshape(direct_cam_pose, [4, 4]).T), dtype=torch.float32))
-                cam_rel_poses.append(torch.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
-        obs["robot_r1::cam_rel_poses"] = torch.cat(cam_rel_poses, axis=-1)
-        return obs
 
     def flush_video(self) -> None:
         """
@@ -441,64 +266,31 @@ class OmnigibsonEnv(gym.Env):
             (448, 448),
         )
         write_video(
-            np.expand_dims(np.hstack([np.vstack([left_wrist_rgb, right_wrist_rgb]), head_rgb]), 0),
+            np.expand_dims(
+                np.hstack([np.vstack([left_wrist_rgb, right_wrist_rgb]), head_rgb]), 0
+            ),
             video_writer=self.video_writer,
             batch_size=1,
             mode="rgb",
         )
 
-    def reset(self) -> None:
-        """
-        Reset the environment, policy, and compute metrics.
-        """
-        self.obs = self._preprocess_obs(self.env.reset()[0])
-        # run metric start callbacks
-        for metric in self.metrics:
-            metric.start_callback(self.env)
-        self.n_success_trials, self.n_trials = 0, 0
-
-    def __enter__(self):
-        signal(SIGINT, self._sigint_handler)
-        return self
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        # print stats
-        logger.info("")
-        logger.info("=" * 50)
-        logger.info(f"Total success trials: {self.n_success_trials}")
-        logger.info(f"Total trials: {self.n_trials}")
-        if self.n_trials > 0:
-            logger.info(f"Success rate: {self.n_success_trials / self.n_trials}")
-        logger.info("=" * 50)
-        logger.info("")
-        if exc_type is not None:
-            traceback.print_exception(exc_type, exc_value, exc_tb)
-        self.video_writer = None
-        self.env.close()
-        og.shutdown()
-
-    def _sigint_handler(self, signal_received, frame):
-        logger.warning("SIGINT or CTRL-C detected.\n")
-        self.__exit__(None, None, None)
-        sys.exit(0)
-
     def _init_metrics(self):
         self.success_once = torch.zeros(
-            self.num_envs, device=self.device, dtype=torch.bool
+            self.cfg.num_envs, device=self.device, dtype=torch.bool
         )
         self.fail_once = torch.zeros(
-            self.num_envs, device=self.device, dtype=torch.bool
+            self.cfg.num_envs, device=self.device, dtype=torch.bool
         )
         self.returns = torch.zeros(
-            self.num_envs, device=self.device, dtype=torch.float32
+            self.cfg.num_envs, device=self.device, dtype=torch.float32
         )
         self.prev_step_reward = torch.zeros(
-            self.num_envs, device=self.device, dtype=torch.float32
+            self.cfg.num_envs, device=self.device, dtype=torch.float32
         )
 
     def _reset_metrics(self, env_idx=None):
         if env_idx is not None:
-            mask = torch.zeros(self.num_envs, dtype=bool, device=self.device)
+            mask = torch.zeros(self.cfg.num_envs, dtype=bool, device=self.device)
             mask[env_idx] = True
             self.prev_step_reward[mask] = 0.0
             if self.record_metrics:
@@ -512,38 +304,55 @@ class OmnigibsonEnv(gym.Env):
                 self.fail_once[:] = False
                 self.returns[:] = 0.0
 
-    def _handle_auto_reset(self, past_dones, extracted_obs, infos):
-        """Handle automatic reset for environments that have finished."""
-        # Reset environments that are done
-        reset_obs = self.env.reset()
-        if isinstance(reset_obs, tuple):
-            reset_obs = reset_obs[0]
-        
-        # Update observations for reset environments
-        for i, is_done in enumerate(past_dones):
-            if is_done:
-                # Reset metrics for this environment
-                self._reset_metrics(env_idx=i)
-                # Update observation (this is a simplified version)
-                # In practice, you might need to handle this more carefully
-                pass
-        
+    def _record_metrics(self, rewards, infos):
+        info_lists = []
+        for env_idx, (reward, info) in enumerate(zip(rewards, infos)):
+            episode_info = {
+                "success": info.get("done", {}).get("success", False),
+                "episode_length": info.get("episode_length", 0),
+            }
+            self.returns[env_idx] += reward
+            if "success" in info:
+                self.success_once[env_idx] = self.success_once[env_idx] | info["success"]
+                episode_info["success_once"] = self.success_once[env_idx].clone()
+            if "fail" in info:
+                self.fail_once[env_idx] = self.fail_once[env_idx] | info["fail"]
+                episode_info["fail_once"] = self.fail_once[env_idx].clone()
+            episode_info["return"] = self.returns[env_idx].clone()
+            episode_info["episode_len"] = self.elapsed_steps.clone()
+            episode_info["reward"] = episode_info["return"] / episode_info["episode_len"]
+            if self.ignore_terminations:
+                episode_info["success_at_end"] = info["success"]
+
+            info_lists.append(episode_info)
+
+        infos = {"episode": to_tensor(list_of_dict_to_dict_of_list(info_lists))}
+        return infos
+
+    def _handle_auto_reset(self, dones, extracted_obs, infos):
+        final_obs = extracted_obs.copy()
+        env_idx = torch.arange(0, self.num_envs, device=self.device)[dones]
+        options = {"env_idx": env_idx}
+        final_info = infos.copy()
+        if self.use_fixed_reset_state_ids:
+            options.update(episode_id=self.reset_state_ids[env_idx])
+        extracted_obs, infos = self.reset()
+        # gymnasium calls it final observation but it really is just o_{t+1} or the true next observation
+        infos["final_observation"] = final_obs
+        infos["final_info"] = final_info
+        infos["_final_info"] = dones
+        infos["_final_observation"] = dones
+        infos["_elapsed_steps"] = dones
         return extracted_obs, infos
 
-    def _record_metrics(self, step_reward, infos):
-        episode_info = {}
-        self.returns += step_reward
-        if "success" in infos:
-            self.success_once = self.success_once | infos["success"]
-            episode_info["success_once"] = self.success_once.clone()
-        if "fail" in infos:
-            self.fail_once = self.fail_once | infos["fail"]
-            episode_info["fail_once"] = self.fail_once.clone()
-        if "done" in infos and infos["done"] is not None and "success" in infos["done"]:
-            self.success_once = self.success_once | infos["done"]["success"]
-            episode_info["success_once"] = self.success_once.clone()
-        episode_info["return"] = self.returns.clone()
-        episode_info["episode_len"] = self.elapsed_steps.clone()
-        episode_info["reward"] = episode_info["return"] / episode_info["episode_len"]
-        infos["episode"] = episode_info
-        return infos
+    def update_reset_state_ids(self):
+        pass
+        # reset_state_ids = torch.randint(
+        #     low=0,
+        #     high=self.total_num_group_envs,
+        #     size=(self.num_group,),
+        #     generator=self._generator,
+        # )
+        # self.reset_state_ids = reset_state_ids.repeat_interleave(
+        #     repeats=self.group_size
+        # ).to(self.device)
