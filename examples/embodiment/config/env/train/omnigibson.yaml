@@ -6,8 +6,8 @@ seed: 0
 num_group: ${algorithm.num_group_envs}
 group_size: ${algorithm.group_size}
 use_fixed_reset_state_ids: ${algorithm.use_fixed_reset_state_ids}
-max_episode_steps: 80
-max_steps: 80
+max_episode_steps: 2000
+max_steps: 2000
 only_eval: False
 image_size: [224, 224]
 
@@ -31,7 +31,7 @@ init_params:
   render_mode: all
   task_type: "turning_on_radio"
 env_wrapper: 
-  _target_: omnigibson.learning.wrappers.RGBLowResWrapper
+  _target_: omnigibson.learning.wrappers.DefaultWrapper
 robot:
   type: R1Pro
   # multi_view_cameras are used by BehaviorIterableDataset

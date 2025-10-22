@@ -116,7 +116,7 @@ class OmnigibsonEnv(gym.Env):
         self.env._current_episode = 0
         self._video_writer = None
         if self.cfg.video_cfg.save_video:
-            video_name = str(self.cfg.video_cfg.video_base_dir) + f"/{self.cfg.init_params.task_type}_{self.env._current_episode}.mp4"
+            video_name = "/mnt/mnt/public/xusi/RLinf-fork-xusi/video/eval/test.mp4"
             self.video_writer = create_video_writer(
                 fpath=video_name,
                 resolution=(448, 672),
@@ -246,6 +246,7 @@ class OmnigibsonEnv(gym.Env):
                 self.n_success_trials += 1
 
         infos = self._record_metrics(step_reward, infos)
+        self._write_video()
         return extracted_obs, step_reward, terminations, truncations, infos
 
     def chunk_step(self, chunk_actions):
@@ -305,7 +306,7 @@ class OmnigibsonEnv(gym.Env):
 
     @property
     def elapsed_steps(self):
-        return torch.tensor(self.env_args["max_episode_steps"])
+        return torch.tensor([self.env_args["max_episode_steps"]], device=self.device)
 
     @property
     def is_start(self):
@@ -314,6 +315,15 @@ class OmnigibsonEnv(gym.Env):
     @is_start.setter
     def is_start(self, value):
         self._is_start = value
+
+    def init_reset_state_ids(self):
+        self._generator = torch.Generator()
+        self._generator.manual_seed(self.seed)
+        self.update_reset_state_ids()
+
+    def update_reset_state_ids(self):
+        # TODO update env here
+        pass
 
     @property
     def video_writer(self) -> Tuple[Container, Stream]:
@@ -411,7 +421,7 @@ class OmnigibsonEnv(gym.Env):
         """
         Flush the video writer.
         """
-        self._write_video()
+        self.video_writer = None
 
     def _write_video(self) -> None:
         """
@@ -529,6 +539,9 @@ class OmnigibsonEnv(gym.Env):
         if "fail" in infos:
             self.fail_once = self.fail_once | infos["fail"]
             episode_info["fail_once"] = self.fail_once.clone()
+        if "done" in infos and infos["done"] is not None and "success" in infos["done"]:
+            self.success_once = self.success_once | infos["done"]["success"]
+            episode_info["success_once"] = self.success_once.clone()
         episode_info["return"] = self.returns.clone()
         episode_info["episode_len"] = self.elapsed_steps.clone()
         episode_info["reward"] = episode_info["return"] / episode_info["episode_len"]

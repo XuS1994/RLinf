@@ -6,10 +6,10 @@ seed: 0
 num_group: ${env.eval.num_envs}
 group_size: 1
 use_fixed_reset_state_ids: True
-num_envs: 1
+num_envs: ${algorithm.num_group_envs}
 only_eval: True
 image_size: [224, 224]
-max_steps: 80
+max_steps: 2000
 
 video_cfg:
   save_video: True
@@ -28,7 +28,7 @@ init_params:
   render_mode: null
   task_type: ${env.train.init_params.task_type}
 env_wrapper: 
-  _target_: omnigibson.learning.wrappers.RGBLowResWrapper
+  _target_: omnigibson.learning.wrappers.DefaultWrapper
 robot:
   type: R1Pro
   # multi_view_cameras are used by BehaviorIterableDataset

@@ -380,7 +380,7 @@ class EnvWorker(Worker):
                     env_output = EnvOutput(
                         simulator_type=self.cfg.env.train.simulator_type,
                         obs=extracted_obs,
-                        rewards=rewards,
+                        rewards=None,
                         dones=dones,
                         final_obs=infos["final_observation"]
                         if "final_observation" in infos

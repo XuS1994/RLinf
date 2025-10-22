@@ -201,7 +201,7 @@ class MultiStepRolloutWorker(Worker):
 
     def recv_env_output(self):
         env_output = self.channel.get(
-            queue_name=f"{self._obs_queue_name}_{self._rank}", async_op=True
+            queue_name=f"{self._obs_queue_name}_{self._rank}", async_op=False
         )
         return env_output
 
@@ -222,7 +222,7 @@ class MultiStepRolloutWorker(Worker):
             self.channel.put(
                 item=splited_rollout_result[i],
                 queue_name=self._replay_buffer_name,
-                async_op=True,
+                async_op=False,
             )
 
     def set_global_step(self, global_step):

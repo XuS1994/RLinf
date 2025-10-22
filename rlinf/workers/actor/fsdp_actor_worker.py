@@ -592,7 +592,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
             gc.collect()
             torch.cuda.empty_cache()
 
-    async def recv_rollout_batch(self):
+    def recv_rollout_batch(self):
         send_num = self._component_placement.get_world_size("rollout") * self.stage_num
         recv_num = self._component_placement.get_world_size("actor")
         split_num = compute_split_num(send_num, recv_num)
@@ -601,9 +601,9 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
         recv_list = []
         for _ in range(split_num):
             recv_list.append(
-                await self.channel.get(
-                    queue_name=self._replay_buffer_name, async_op=True
-                ).async_wait()
+                self.channel.get(
+                    queue_name=self._replay_buffer_name, async_op=False
+                )
             )
 
         # shape [num_chunk, bsz, chunk_size], cat dim 1
