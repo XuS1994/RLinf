@@ -30,6 +30,8 @@ RLinf is a flexible and scalable open-source infrastructure designed for post-tr
 
 
 ## What's NEW!
+- [2025/11] 🔥 RLinf supports reinforcement learning fine-tuning for Behavior 1k. Doc: [RL on Behavior 1k](https://rlinf.readthedocs.io/en/latest/rst_source/examples/behavior.html) 
+- [2025/11] Add lora to pi0.
 - [2025/10] 🔥 RLinf supports reinforcement learning fine-tuning for Pi 0 and Pi0.5! Doc: [RL on π₀ and π₀.₅ Models](https://rlinf.readthedocs.io/en/latest/rst_source/examples/pi0.html). For more technical details, refer to the [RL fine-tuning for π₀ and π₀.₅ technical report](https://arxiv.org/abs/2510.25889).
 - [2025/10] 🔥 RLinf now officially supports online reinforcement learning! Doc: [coding_online_rl](https://rlinf.readthedocs.io/en/latest/rst_source/examples/coding_online_rl.html), Blog post: [The first open-source agent online RL framework RLinf-Online](https://mp.weixin.qq.com/s/jmohmDokuWLhQHFueSHZIQ).
 - [2025/10] 🔥 The RLinf Algorithm Technical Report [RLinf-VLA: A Unified and Efficient Framework for VLA+RL Training](https://arxiv.org/abs/2510.06710) is released.
