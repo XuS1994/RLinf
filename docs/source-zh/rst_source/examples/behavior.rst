@@ -1,5 +1,5 @@
-基于ManiSkill模拟器的强化学习训练
-=============================
+基于Behavior模拟器的强化学习训练
+============================
 
 本示例提供了在 `Behavior <https://behavior.stanford.edu/index.html>`_ 环境中使用 **RLinf** 框架
 通过强化学习微调 Behavior 算法的完整指南。它涵盖了整个过程——从
