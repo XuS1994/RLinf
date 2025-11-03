@@ -113,6 +113,7 @@
 .. code:: bash
 
    export ISAAC_PATH=/path/to/isaac-sim
+   mkdir -p $ISAAC_PATH && cd $ISAAC_PATH
    curl https://download.isaacsim.omniverse.nvidia.com/isaac-sim-standalone-4.5.0-linux-x86_64.zip -o isaac-sim.zip
    unzip isaac-sim.zip && rm isaac-sim.zip
 
