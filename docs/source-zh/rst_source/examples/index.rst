@@ -56,7 +56,7 @@
          <a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/behavior.html" target="_blank" style="text-decoration: underline; color: blue;">
           <b>基于Behavior的强化学习</b>
          </a><br>
-         支持Behavior+OpenVLA+PPO/GRPO训练
+         支持Behavior+OpenVLA-OFT+PPO/GRPO训练
        </p>
      </div>
 

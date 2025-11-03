@@ -59,7 +59,7 @@ as well as reinforcement learning training examples on real robots.
          <a href="https://rlinf.readthedocs.io/en/latest/rst_source/examples/behavior.html" target="_blank" style="text-decoration: underline; color: blue;">
           <b>Reinforcement Learning on Behavior Simulator</b>
          </a><br>
-         Support Behavior+OpenVLA+PPO/GRPO training
+         Support Behavior+OpenVLA-OFT+PPO/GRPO training
        </p>
      </div>
 
