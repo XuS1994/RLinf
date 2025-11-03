@@ -30,7 +30,7 @@ RLinf 是一个灵活且可扩展的开源框架，专为利用强化学习进�
 
 
 ## 最新动态
-- [2025/11] 🔥 基于[Behavior 1k](https://github.com/StanfordVL/BEHAVIOR-1K)的强化学习微调已经上线! 文档：[RL on Behavior 1k](https://rlinf.readthedocs.io/en/latest/rst_source/examples/behavior.html) 
+- [2025/11] 🔥 基于[Behavior 1k](https://github.com/StanfordVL/BEHAVIOR-1K)的强化学习微调已经上线! 文档：[RL on Behavior 1k](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/behavior.html) 
 - [2025/11] Pi0添加lora。
 - [2025/10] 🔥 Pi0和Pi0.5的强化学习微调已经上线! 文档：[π₀和π₀.₅模型强化学习训练](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/pi0.html)。更多技术细节请参考：[π₀ 与 π₀.₅ 模型强化学习微调技术报告](https://arxiv.org/abs/2510.25889)。
 - [2025/10] 🔥 RLinf 正式支持在线强化学习！文档：[coding_online_rl](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/coding_online_rl.html)，同时发布文章 [《首个开源的Agent在线强化学习框架RLinf-Online！让你的Agent今天比昨天更聪明》](https://mp.weixin.qq.com/s/jmohmDokuWLhQHFueSHZIQ)。
@@ -62,7 +62,7 @@ RLinf 是一个灵活且可扩展的开源框架，专为利用强化学习进�
           <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/libero.html">LIBERO</a> ✅</li>
           <li>RoboTwin</li>
           <li>RoboVerse</li>
-          <li><a href="https://rlinf.readthedocs.io/en/latest/rst_source/examples/behavior.html">BEHAVIOR</a> ✅</li>
+          <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/behavior.html">BEHAVIOR</a> ✅</li>
           <li>IsaacLab</li>
           <li>robocasa</li>
           <li>More...</li>

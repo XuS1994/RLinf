@@ -1,5 +1,5 @@
 基于ManiSkill模拟器的强化学习训练
-==============================
+=============================
 
 本示例提供了在 `Behavior <https://behavior.stanford.edu/index.html>`_ 环境中使用 **RLinf** 框架
 通过强化学习微调 Behavior 算法的完整指南。它涵盖了整个过程——从
@@ -128,6 +128,7 @@
    # 将以下环境变量改到你希望存放Behavior资源和数据集的目录
    # 注意，相关数据集会占用超过30GB的存储空间
    export OMNIGIBSON_DATA_PATH=/path/to/BEHAVIOR-1K-datasets
+   mkdir -p $OMNIGIBSON_DATA_PATH
 
    # 请确保您在运行下面的命令前已激活正确的 Python 虚拟环境（venv）
    # 如果您在使用 Docker 镜像，您需要通过`source switch_env openvla-oft`命令切换到`openvla-oft`环境

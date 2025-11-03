@@ -1,5 +1,5 @@
 RL with Behavior Simulator
-============================================
+==========================
 
 This example provides a complete guide to fine-tuning the 
 Behavior algorithms with reinforcement learning in the `Behavior <https://behavior.stanford.edu/index.html>`_ environment
@@ -126,6 +126,7 @@ Assets and Datasets
    # Change to the directory you wish to put the assets and datasets
    # Beware, the datasets occupy more than 30GB of space
    export OMNIGIBSON_DATA_PATH=/path/to/BEHAVIOR-1K-datasets
+   mkdir -p $OMNIGIBSON_DATA_PATH
 
    # Make sure you are inside the correct Python virtual environment (venv) before running below commands
    # For our Docker image, you need to switch to the `openvla-oft` venv via `source switch_env openvla-oft`
