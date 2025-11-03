@@ -1,4 +1,4 @@
-基于 Behavior 的强化学习
+基于ManiSkill模拟器的强化学习训练
 ==============================
 
 本示例提供了在 `Behavior <https://behavior.stanford.edu/index.html>`_ 环境中使用 **RLinf** 框架
@@ -113,7 +113,7 @@
 .. code:: bash
 
    export ISAAC_PATH=/path/to/isaac-sim
-   mkdir -p $ISAAC_PATH && cd $ISAAC_PATH
+   mkdir -p $ISAAC_PATH
    curl https://download.isaacsim.omniverse.nvidia.com/isaac-sim-standalone-4.5.0-linux-x86_64.zip -o isaac-sim.zip
    unzip isaac-sim.zip && rm isaac-sim.zip
 
@@ -303,5 +303,5 @@ env 和 rollout 之间的管道重叠，以及与 actor 的共享。
 
 
 对于 Behavior 实验，我们受到了 
-`Behavior-1K baselines <https://github.com/StanfordVL/b1k-baselines.git>` 的启发， 
+`Behavior-1K baselines <https://github.com/StanfordVL/b1k-baselines.git>`_ 的启发， 
 仅进行了少量修改。我们感谢作者发布开源代码。
