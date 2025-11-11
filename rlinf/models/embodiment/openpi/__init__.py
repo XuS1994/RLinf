@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # openpi model configs
-import dataclasses
 import difflib
 from typing import Optional
 
@@ -141,6 +140,21 @@ _CONFIGS = [
             "checkpoints/jax/pi0_base/params"
         ),
         pytorch_weight_path="checkpoints/torch/pi0_base",
+    ),
+    TrainConfig(
+        name="pi0_behavior",
+        model=pi0_config.Pi0Config(),
+        data=LeRobotBehaviorDataConfig(
+            repo_id="physical-intelligence/behavior",
+            base_config=DataConfig(prompt_from_task=True),
+            assets=AssetsConfig(assets_dir="checkpoints/torch/pi0_behavior/assets"),
+            extra_delta_transform=True,
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            "checkpoints/jax/pi0_base/params"
+        ),
+        pytorch_weight_path="checkpoints/torch/pi0_base",
+        num_train_steps=30_000,
     ),
     TrainConfig(
         name="pi05_metaworld",
