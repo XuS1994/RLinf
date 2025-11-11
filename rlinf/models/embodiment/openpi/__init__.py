@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # openpi model configs
-import dataclasses
 import difflib
 from typing import Optional
 
@@ -39,9 +38,6 @@ from rlinf.models.embodiment.openpi.dataconfig.maniskill_dataconfig import (
 )
 from rlinf.models.embodiment.openpi.dataconfig.metaworld_dataconfig import (
     LeRobotMetaworldDataConfig,
-)
-from rlinf.models.embodiment.openpi.dataconfig.robocasa_dataconfig import (
-    LeRobotRobocasaDataConfig,
 )
 
 _CONFIGS = [
@@ -140,6 +136,21 @@ _CONFIGS = [
         pytorch_weight_path="checkpoints/torch/pi0_base",
     ),
     TrainConfig(
+        name="pi0_behavior",
+        model=pi0_config.Pi0Config(),
+        data=LeRobotBehaviorDataConfig(
+            repo_id="physical-intelligence/behavior",
+            base_config=DataConfig(prompt_from_task=True),
+            assets=AssetsConfig(assets_dir="checkpoints/torch/pi0_behavior/assets"),
+            extra_delta_transform=True,
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            "checkpoints/jax/pi0_base/params"
+        ),
+        pytorch_weight_path="checkpoints/torch/pi0_base",
+        num_train_steps=30_000,
+    ),
+    TrainConfig(
         name="pi05_metaworld",
         model=pi0_config.Pi0Config(
             pi05=True, action_horizon=5, discrete_state_input=False
@@ -205,20 +216,6 @@ _CONFIGS = [
         ),
         pytorch_weight_path="checkpoints/torch/pi0_base",
         num_train_steps=30_000,
-    ),
-    TrainConfig(
-        name="pi0_custom",
-        model=pi0_config.Pi0Config(),
-        data=CustomDataConfig(
-            repo_id="physical-intelligence/custom_dataset",
-            base_config=DataConfig(
-                prompt_from_task=True
-            ),  # we need language instruction
-            assets=AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets"),
-            extra_delta_transform=False,  # True for delta action, False for abs_action
-            action_train_with_rotation_6d=False,  # User can add extra config in custom dataset
-        ),
-        pytorch_weight_path="checkpoints/torch/pi0_base",
     ),
 ]
 
