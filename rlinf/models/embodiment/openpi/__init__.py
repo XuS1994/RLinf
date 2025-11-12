@@ -30,6 +30,9 @@ from rlinf.models.embodiment.openpi.dataconfig.calvin_dataconfig import (
 from rlinf.models.embodiment.openpi.dataconfig.franka_dataconfig import (
     CustomDataConfig,
 )
+from rlinf.models.embodiment.openpi.dataconfig.behavior_dataconfig import (
+    LeRobotBehaviorDataConfig,
+)
 from rlinf.models.embodiment.openpi.dataconfig.libero_dataconfig import (
     LeRobotLiberoDataConfig,
 )
