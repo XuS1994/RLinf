@@ -37,6 +37,8 @@ def _parse_image(image) -> np.ndarray:
         image = (255 * image).astype(np.uint8)
     if image.shape[0] == 3:
         image = einops.rearrange(image, "c h w -> h w c")
+    elif image.shape[0] == 2 and image.shape[1] == 3:
+        image = einops.rearrange(image, "n c h w -> n h w c")
     return image
 
 
@@ -64,17 +66,18 @@ class BehaviorInputs(transforms.DataTransformFn):
         # of image, e.g. wrist images, you can comment it out here and
         # replace it with zeros like we do for the
         # right wrist image below.
-        base_image = _parse_image(data["observation/image"]) # [num_env, c, h, w]
-        wrist_image = _parse_image(data["observation/wrist_image"]) # [num_env, num_image, c, h, w]
+        base_image = _parse_image(data["observation/image"])  # [h, w, c]
+        wrist_image = _parse_image(
+            data["observation/wrist_image"]
+        )  # [num_image, h, w, c]
 
         # Create inputs dict. Do not change the keys in the dict below.
         inputs = {
             "state": data["observation/state"],
             "image": {
                 "base_0_rgb": base_image,
-                "left_wrist_0_rgb": np.zeros_like(base_image), #wrist_image[:,0,...],
-                # Pad any non-existent images with zero-arrays of the appropriate shape.
-                "right_wrist_0_rgb": np.zeros_like(base_image), #wrist_image[:,1,...],
+                "left_wrist_0_rgb": wrist_image[0, ...],
+                "right_wrist_0_rgb": wrist_image[1, ...],
             },
             "image_mask": {
                 "base_0_rgb": np.True_,
