@@ -118,7 +118,7 @@ class BehaviorEnv(gym.Env):
                     zed_image = permute_and_norm(v["rgb"])
                 elif "proprio" in k:
                     state = v
-        assert state is not None
+        assert state is not None, "state is not found in the observation which is required for the behavior training."
 
         return {
             "images": zed_image,  # [C, H, W]

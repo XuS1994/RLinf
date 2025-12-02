@@ -249,7 +249,7 @@ Using behavior as an example:
 - OpenVLA-OFT + GRPO:
   ``examples/embodiment/config/behavior_grpo_openvlaoft.yaml``
 - Openpi + PPO:
-  ``examples/embodiment/config/behavior_ppo_openpit.yaml``
+  ``examples/embodiment/config/behavior_ppo_openpi.yaml``
 - Openpi + GRPO:
   ``examples/embodiment/config/behavior_grpo_openpi.yaml``
 

@@ -244,7 +244,7 @@ env 和 rollout 之间的管道重叠，以及与 actor 的共享。
 - OpenVLA-OFT + GRPO:
   ``examples/embodiment/config/behavior_grpo_openvlaoft.yaml``
 - Openpi + PPO:
-  ``examples/embodiment/config/behavior_ppo_openpit.yaml``
+  ``examples/embodiment/config/behavior_ppo_openpi.yaml``
 - Openpi + GRPO:
   ``examples/embodiment/config/behavior_grpo_openpi.yaml``
 
