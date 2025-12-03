@@ -6,6 +6,9 @@ on:
 jobs:
   embodied-maniskill-ppo-openvla-test:
     runs-on: image-test
+    defaults:
+      run:
+        shell: bash
     container:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
@@ -23,6 +26,9 @@ jobs:
           
   embodied-maniskill-grpo-openvlaoft-test:
     runs-on: image-test
+    defaults:
+      run:
+        shell: bash
     container:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
@@ -41,6 +47,9 @@ jobs:
 
   embodied-libero-goal-grpo-openvlaoft-test:
     runs-on: image-test
+    defaults:
+      run:
+        shell: bash
     container:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
@@ -58,6 +67,9 @@ jobs:
 
   embodied-libero-130-grpo-openvlaoft-test:
     runs-on: image-test
+    defaults:
+      run:
+        shell: bash
     container:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
@@ -75,6 +87,9 @@ jobs:
 
   embodied-libero-spatial-ppo-openpi-test:
     runs-on: image-test
+    defaults:
+      run:
+        shell: bash
     container:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
@@ -92,6 +107,9 @@ jobs:
 
   embodied-libero-spatial-ppo-openpi05-test:
     runs-on: image-test
+    defaults:
+      run:
+        shell: bash
     container:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
