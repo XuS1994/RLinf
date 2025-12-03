@@ -9,20 +9,16 @@ jobs:
     defaults:
       run:
         shell: bash
+    image: harbor.infini-ai.com/magatron_infinigence_images/megatron-infinigence:latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
       - name: OpenVLA test
         timeout-minutes: 20
         run: |
-          docker run --rm -it \
-          --gpus=all \
-          --shm-size=2g \
-          -v "/workspace/dataset:/workspace/dataset" \
-          -v "/tmp/test_script.sh:/test_script.sh" \
-          -w /workspace/src \
-          rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0 \
-          /bin/bash -c "export REPO_PATH=$(pwd);source switch_env openvla;bash tests/e2e_tests/embodied/run.sh maniskill_ppo_openvla"
+          export REPO_PATH=$(pwd)
+          source switch_env openvla
+          bash tests/e2e_tests/embodied/run.sh maniskill_ppo_openvla
           
   # embodied-maniskill-grpo-openvlaoft-test:
   #   runs-on: image-test
