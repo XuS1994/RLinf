@@ -28,8 +28,6 @@ jobs:
         - /workspace/dataset:/workspace/dataset
       options: --rm -it --gpus="all" --shm-size=2g
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
       - name: OpenVLA test
         timeout-minutes: 20
         run: |
@@ -50,8 +48,6 @@ jobs:
         - /workspace/dataset:/workspace/dataset
       options: --rm -it --gpus="all" --shm-size=2g
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
       - name: OpenVLA-OFT test
         timeout-minutes: 20
         run: |
@@ -70,8 +66,6 @@ jobs:
         - /workspace/dataset:/workspace/dataset
       options: --rm -it --gpus="all" --shm-size=2g
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
       - name: OpenVLA-OFT test
         timeout-minutes: 20
         run: |
@@ -90,8 +84,6 @@ jobs:
         - /workspace/dataset:/workspace/dataset
       options: --rm -it --gpus="all" --shm-size=2g
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
       - name: OPENPI test
         timeout-minutes: 20
         run: |
@@ -110,8 +102,6 @@ jobs:
         - /workspace/dataset:/workspace/dataset
       options: --rm -it --gpus="all" --shm-size=2g
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
       - name: OPENPI test
         timeout-minutes: 20
         run: |
@@ -127,8 +117,6 @@ jobs:
         - /workspace/dataset:/workspace/dataset
       options: --rm -it --gpus="all" --shm-size=2g
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
       - name: BEHAVIOR-OpenVLA-OFT test
         timeout-minutes: 20
         run: |
