@@ -26,7 +26,7 @@ jobs:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
         - /workspace/dataset:/workspace/dataset
-      options: -it --gpus="all" --shm-size=2g
+      options: --rm -it --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -48,7 +48,7 @@ jobs:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
         - /workspace/dataset:/workspace/dataset
-      options: -it --gpus="all" --shm-size=2g
+      options: --rm -it --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -68,7 +68,7 @@ jobs:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
         - /workspace/dataset:/workspace/dataset
-      options: -it --gpus="all" --shm-size=2g
+      options: --rm -it --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -88,7 +88,7 @@ jobs:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
         - /workspace/dataset:/workspace/dataset
-      options: -it --gpus="all" --shm-size=2g
+      options: --rm -it --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -108,7 +108,7 @@ jobs:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
         - /workspace/dataset:/workspace/dataset
-      options: -it --gpus="all" --shm-size=2g
+      options: --rm -it --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -125,7 +125,7 @@ jobs:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
         - /workspace/dataset:/workspace/dataset
-      options: -it --gpus="all" --shm-size=2g
+      options: --rm -it --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -144,7 +144,7 @@ jobs:
   #     image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
   #     volumes:
   #       - /workspace/dataset:/workspace/dataset
-  #     options: -it --gpus="all" --shm-size=2g
+  #     options: --rm -it --gpus="all" --shm-size=2g
   #   steps:
   #     - name: Checkout code
   #       uses: actions/checkout@v5
