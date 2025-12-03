@@ -34,30 +34,30 @@ jobs:
           echo "This pull request does not have the 'run-ci' label. Failing the workflow."
           exit 1
 
-      # - name: Fail if the PR is a draft
-      #   if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
-      #   run: |
-      #     echo "This pull request is a draft. Failing the workflow."
-      #     exit 1
+      - name: Fail if the PR is a draft
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
+        run: |
+          echo "This pull request is a draft. Failing the workflow."
+          exit 1
 
-      # - name: Detect file changes
-      #   id: filter
-      #   uses: dorny/paths-filter@v3
-      #   with:
-      #     filters: |
-      #       file_filter:
-      #         - '**/*.py'
-      #         - 'tests/**'
-      #         - '.github/workflows/*tests.yml'
-      #         - '*.yaml'
-      #       install_filter:
-      #         - 'pyproject.toml'
-      #         - 'requirements/*.sh'
-      #         - 'requirements/*.txt'
-      #         - '.github/workflows/install.yml'
-      #       docker_filter:
-      #         - 'docker/torch*/**'
-      #         - '.github/workflows/docker-build.yml'
+      - name: Detect file changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            file_filter:
+              - '**/*.py'
+              - 'tests/**'
+              - '.github/workflows/*tests.yml'
+              - '*.yaml'
+            install_filter:
+              - 'pyproject.toml'
+              - 'requirements/*.sh'
+              - 'requirements/*.txt'
+              - '.github/workflows/install.yml'
+            docker_filter:
+              - 'docker/torch*/**'
+              - '.github/workflows/docker-build.yml'
 
 
   # =============================================== install tests ====================================================
