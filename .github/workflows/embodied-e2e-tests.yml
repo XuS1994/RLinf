@@ -9,11 +9,6 @@ jobs:
     defaults:
       run:
         shell: bash
-    container:
-      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
-      volumes:
-        - /workspace/dataset:/workspace/dataset
-      options: -it --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -38,6 +33,7 @@ jobs:
       - name: OpenVLA test
         timeout-minutes: 20
         run: |
+          echo "Deploy to production server"
           export REPO_PATH=$(pwd)
           source switch_env openvla-oft
           cp -r /workspace/dataset/maniskill_assets/assets ${REPO_PATH}/rlinf/envs/maniskill/
