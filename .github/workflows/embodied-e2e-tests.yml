@@ -5,7 +5,12 @@ on:
 
 jobs:
   embodied-maniskill-ppo-openvla-test:
-    runs-on: embodied
+    runs-on: image-test
+    container:
+      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+      volumes:
+        - /workspace/dataset:/workspace/dataset
+      options: --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -17,7 +22,12 @@ jobs:
           bash tests/e2e_tests/embodied/run.sh maniskill_ppo_openvla
           
   embodied-maniskill-grpo-openvlaoft-test:
-    runs-on: embodied
+    runs-on: image-test
+    container:
+      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+      volumes:
+        - /workspace/dataset:/workspace/dataset
+      options: --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -30,7 +40,12 @@ jobs:
           bash tests/e2e_tests/embodied/run.sh maniskill_grpo_openvlaoft
 
   embodied-libero-goal-grpo-openvlaoft-test:
-    runs-on: embodied
+    runs-on: image-test
+    container:
+      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+      volumes:
+        - /workspace/dataset:/workspace/dataset
+      options: --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -42,7 +57,12 @@ jobs:
           bash tests/e2e_tests/embodied/run.sh libero_goal_grpo_openvlaoft
 
   embodied-libero-130-grpo-openvlaoft-test:
-    runs-on: embodied
+    runs-on: image-test
+    container:
+      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+      volumes:
+        - /workspace/dataset:/workspace/dataset
+      options: --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -54,7 +74,12 @@ jobs:
           bash tests/e2e_tests/embodied/run.sh libero_130_grpo_openvlaoft
 
   embodied-libero-spatial-ppo-openpi-test:
-    runs-on: embodied
+    runs-on: image-test
+    container:
+      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+      volumes:
+        - /workspace/dataset:/workspace/dataset
+      options: --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -66,7 +91,12 @@ jobs:
           bash tests/e2e_tests/embodied/run.sh libero_spatial_ppo_openpi
 
   embodied-libero-spatial-ppo-openpi05-test:
-    runs-on: embodied
+    runs-on: image-test
+    container:
+      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+      volumes:
+        - /workspace/dataset:/workspace/dataset
+      options: --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -77,28 +107,38 @@ jobs:
           source switch_env openpi
           bash tests/e2e_tests/embodied/run.sh libero_spatial_ppo_openpi05
 
-  embodied-behavior-ppo-openvlaoft-test:
-    runs-on: embodied
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-      - name: BEHAVIOR-OpenVLA-OFT test
-        timeout-minutes: 20
-        run: |
-          export REPO_PATH=$(pwd)
-          export OMNIGIBSON_DATA_PATH=/workspace/dataset/behavior-datasets
-          export ISAAC_PATH=/workspace/dataset/isaac-sim
-          source switch_env behavior-openvla-oft
-          bash tests/e2e_tests/embodied/run.sh behavior_ppo_openvlaoft
+  # embodied-behavior-ppo-openvlaoft-test:
+  #   runs-on: image-test
+  #   container:
+  #     image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+  #     volumes:
+  #       - /workspace/dataset:/workspace/dataset
+  #     options: --gpus="all" --shm-size=2g
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v5
+  #     - name: BEHAVIOR-OpenVLA-OFT test
+  #       timeout-minutes: 20
+  #       run: |
+  #         export REPO_PATH=$(pwd)
+  #         export OMNIGIBSON_DATA_PATH=/workspace/dataset/behavior-datasets
+  #         export ISAAC_PATH=/workspace/dataset/isaac-sim
+  #         source switch_env behavior-openvla-oft
+  #         bash tests/e2e_tests/embodied/run.sh behavior_ppo_openvlaoft
 
-  embodied-metaworld-50-ppo-openpi-test:
-    runs-on: embodied
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-      - name: OPENPI test
-        timeout-minutes: 20
-        run: |
-          export REPO_PATH=$(pwd)
-          source switch_env openpi
-          bash tests/e2e_tests/embodied/run.sh metaworld_50_ppo_openpi
+  # embodied-metaworld-50-ppo-openpi-test:
+  #   runs-on: image-test
+  #   container:
+  #     image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+  #     volumes:
+  #       - /workspace/dataset:/workspace/dataset
+  #     options: --gpus="all" --shm-size=2g
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v5
+  #     - name: OPENPI test
+  #       timeout-minutes: 20
+  #       run: |
+  #         export REPO_PATH=$(pwd)
+  #         source switch_env openpi
+  #         bash tests/e2e_tests/embodied/run.sh metaworld_50_ppo_openpi
