@@ -13,7 +13,7 @@ jobs:
       image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
       volumes:
         - /workspace/dataset:/workspace/dataset
-      options: --gpus="all" --shm-size=2g
+      options: -it --gpus="all" --shm-size=2g
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -21,7 +21,6 @@ jobs:
         timeout-minutes: 20
         run: 
           echo "Deploy to production server"
-          (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
           
   # embodied-maniskill-grpo-openvlaoft-test:
   #   runs-on: image-test

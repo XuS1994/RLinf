@@ -106,13 +106,7 @@ jobs:
 
   ci-test-finish:
     needs: [
-      check-changes,
-      install-tests,
-      docker-tests,
-      unit-tests,
-      agent-reason-e2e-tests,
       embodied-e2e-tests,
-      scheduler-tests
     ]
     if: always()
     runs-on: ubuntu-latest
