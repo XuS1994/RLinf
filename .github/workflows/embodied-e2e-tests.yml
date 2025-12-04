@@ -18,13 +18,25 @@ jobs:
       runner-label: ${{ steps.create-runner.outputs.runner-label }}
       mlp-task-id: ${{ steps.create-runner.outputs.mlp-task-id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: create-runner
         uses: volcengine/vemlp-github-runner@v1
         with:
           mode: "create"
           faas-url: "${{ env.DYNAMIC_RUNNER_ENDPOINT }}"
           mlp-image: "${{ env.IMAGE }}"
+
+  embodied-maniskill-ppo-openvla-test:
+    runs-on: embodied
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: OpenVLA test
+        timeout-minutes: 20
+        run: |
+          export REPO_PATH=$(pwd)
+          source switch_env openvla
+          bash tests/e2e_tests/embodied/run.sh maniskill_ppo_openvla
 
   embodied-libero-goal-grpo-openvlaoft-test:
     needs: setup
@@ -41,7 +53,7 @@ jobs:
 
   cleanup:
     runs-on: image-test
-    needs: [setup, vllm]
+    needs: [setup, embodied-libero-goal-grpo-openvlaoft-test]
     if: always()
     steps:
       - id: destroy-runner
