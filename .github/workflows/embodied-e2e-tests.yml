@@ -11,10 +11,11 @@ permissions:
 
 jobs:
   embodied-maniskill-ppo-openvla-test:
-    name: verl Ascend test (self-host)
     runs-on: image-test
     container:
       image: ${{ env.DEFAULT_IMAGE }}"
+      volumes:
+        - /workspace/dataset:/workspace/dataset
       options: >-
         --shm-size 16g
     env:
@@ -33,25 +34,25 @@ jobs:
           source switch_env openvla
           bash tests/e2e_tests/embodied/run.sh maniskill_grpo_openvla
 
-  # embodied-maniskill-grpo-openvlaoft-test:
-  #   runs-on: image-test
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #   container:
-  #     image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
-  #     volumes:
-  #       - /workspace/dataset:/workspace/dataset
-  #     options: --rm -it --gpus="all" --shm-size=2g
-  #   steps:
-  #     - name: OpenVLA test
-  #       timeout-minutes: 20
-  #       run: |
-  #         echo "Deploy to production server"
-  #         export REPO_PATH=$(pwd)
-  #         source switch_env openvla-oft
-  #         cp -r /workspace/dataset/maniskill_assets/assets ${REPO_PATH}/rlinf/envs/maniskill/
-  #         bash tests/e2e_tests/embodied/run.sh maniskill_grpo_openvlaoft 2>&1 | tee /tmp/test_output.log
+  embodied-maniskill-grpo-openvlaoft-test:
+    runs-on: image-test
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+      volumes:
+        - /workspace/dataset:/workspace/dataset
+      options: --rm -it --gpus="all" --shm-size=2g
+    steps:
+      - name: OpenVLA test
+        timeout-minutes: 20
+        run: |
+          echo "Deploy to production server"
+          export REPO_PATH=$(pwd)
+          source switch_env openvla-oft
+          cp -r /workspace/dataset/maniskill_assets/assets ${REPO_PATH}/rlinf/envs/maniskill/
+          bash tests/e2e_tests/embodied/run.sh maniskill_grpo_openvlaoft 2>&1 | tee /tmp/test_output.log
 
   # embodied-libero-goal-grpo-openvlaoft-test:
   #   runs-on: image-test
