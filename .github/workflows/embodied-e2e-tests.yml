@@ -5,28 +5,26 @@ on:
 
 env:
   IMAGE: "rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0" # e.g. "verl-ci-cn-beijing.cr.volces.com/verlai/verl:sgl055.dev2"
-  DYNAMIC_RUNNER_URL: "https://sd10g3clalm04ug7alq90.apigateway-cn-beijing.volceapi.com/runner" # public veFaas api
+
+permissions:
+  contents: read
 
 jobs:
-  setup:
-    runs-on: image-test
-    outputs:
-      runner-label: ${{ steps.create-runner.outputs.runner-label }}
-      task-id: ${{ steps.create-runner.outputs.task-id }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: create-runner
-        uses: volcengine/vemlp-github-runner@v1 
-        with:
-          mode: "create"
-          image: "${{ env.DEFAULT_IMAGE }}"
-
-
   embodied-maniskill-ppo-openvla-test:
+    name: verl Ascend test (self-host)
     runs-on: image-test
+    container:
+      image: ${{ env.DEFAULT_IMAGE }}"
+      options: >-
+        --shm-size 16g
+    env:
+      HF_ENDPOINT: "https://hf-mirror.com"
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          clean: true
       - name: OpenVLA test
         timeout-minutes: 20
         run: |
@@ -34,18 +32,6 @@ jobs:
           export REPO_PATH=$(pwd)
           source switch_env openvla
           bash tests/e2e_tests/embodied/run.sh maniskill_grpo_openvla
-
-
-  cleanup:
-    runs-on: image-test
-    needs: [setup, embodied-maniskill-ppo-openvla-test]
-    if: always()
-    steps:
-      - id: destroy-runner
-        uses: volcengine/vemlp-github-runner@v1
-        with:
-          mode: "destroy"
-          task-id: "${{ needs.setup.outputs.task-id }}"
 
   # embodied-maniskill-grpo-openvlaoft-test:
   #   runs-on: image-test
