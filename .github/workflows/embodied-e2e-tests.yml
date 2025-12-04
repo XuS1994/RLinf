@@ -3,128 +3,158 @@ name: Embodied End-to-End Tests
 on:
   workflow_call:
 
+env:
+  IMAGE: "rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0" # e.g. "verl-ci-cn-beijing.cr.volces.com/verlai/verl:sgl055.dev2"
+  DYNAMIC_RUNNER_URL: "https://sd10g3clalm04ug7alq90.apigateway-cn-beijing.volceapi.com/runner" # public veFaas api
+
 jobs:
+  setup:
+    runs-on: image-test
+    outputs:
+      runner-label: ${{ steps.create-runner.outputs.runner-label }}
+      task-id: ${{ steps.create-runner.outputs.task-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: create-runner
+        uses: volcengine/vemlp-github-runner@v1 
+        with:
+          mode: "create"
+          image: "${{ env.DEFAULT_IMAGE }}"
+
+
   embodied-maniskill-ppo-openvla-test:
     runs-on: image-test
-    defaults:
-      run:
-        shell: bash
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
       - name: OpenVLA test
         timeout-minutes: 20
-        run: 
-          echo "Deploy to production server"
-          
-  embodied-maniskill-grpo-openvlaoft-test:
-    runs-on: image-test
-    defaults:
-      run:
-        shell: bash
-    container:
-      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
-      volumes:
-        - /workspace/dataset:/workspace/dataset
-      options: --rm -it --gpus="all" --shm-size=2g
-    steps:
-      - name: OpenVLA test
-        timeout-minutes: 20
         run: |
           echo "Deploy to production server"
           export REPO_PATH=$(pwd)
-          source switch_env openvla-oft
-          cp -r /workspace/dataset/maniskill_assets/assets ${REPO_PATH}/rlinf/envs/maniskill/
-          bash tests/e2e_tests/embodied/run.sh maniskill_grpo_openvlaoft 2>&1 | tee /tmp/test_output.log
+          source switch_env openvla
+          bash tests/e2e_tests/embodied/run.sh maniskill_grpo_openvla
 
-  embodied-libero-goal-grpo-openvlaoft-test:
-    runs-on: image-test
-    defaults:
-      run:
-        shell: bash
-    container:
-      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
-      volumes:
-        - /workspace/dataset:/workspace/dataset
-      options: --rm -it --gpus="all" --shm-size=2g
-    steps:
-      - name: OpenVLA-OFT test
-        timeout-minutes: 20
-        run: |
-          export REPO_PATH=$(pwd)
-          source switch_env openvla-oft
-          bash tests/e2e_tests/embodied/run.sh libero_goal_grpo_openvlaoft 2>&1 | tee /tmp/test_output.log
 
-  embodied-libero-130-grpo-openvlaoft-test:
+  cleanup:
     runs-on: image-test
-    defaults:
-      run:
-        shell: bash
-    container:
-      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
-      volumes:
-        - /workspace/dataset:/workspace/dataset
-      options: --rm -it --gpus="all" --shm-size=2g
+    needs: [setup, embodied-maniskill-ppo-openvla-test]
+    if: always()
     steps:
-      - name: OpenVLA-OFT test
-        timeout-minutes: 20
-        run: |
-          export REPO_PATH=$(pwd)
-          source switch_env openvla-oft
-          bash tests/e2e_tests/embodied/run.sh libero_130_grpo_openvlaoft 2>&1 | tee /tmp/test_output.log
+      - id: destroy-runner
+        uses: volcengine/vemlp-github-runner@v1
+        with:
+          mode: "destroy"
+          task-id: "${{ needs.setup.outputs.task-id }}"
 
-  embodied-libero-spatial-ppo-openpi-test:
-    runs-on: image-test
-    defaults:
-      run:
-        shell: bash
-    container:
-      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
-      volumes:
-        - /workspace/dataset:/workspace/dataset
-      options: --rm -it --gpus="all" --shm-size=2g
-    steps:
-      - name: OPENPI test
-        timeout-minutes: 20
-        run: |
-          export REPO_PATH=$(pwd)
-          source switch_env openpi
-          bash tests/e2e_tests/embodied/run.sh libero_spatial_ppo_openpi 2>&1 | tee /tmp/test_output.log
+  # embodied-maniskill-grpo-openvlaoft-test:
+  #   runs-on: image-test
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   container:
+  #     image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+  #     volumes:
+  #       - /workspace/dataset:/workspace/dataset
+  #     options: --rm -it --gpus="all" --shm-size=2g
+  #   steps:
+  #     - name: OpenVLA test
+  #       timeout-minutes: 20
+  #       run: |
+  #         echo "Deploy to production server"
+  #         export REPO_PATH=$(pwd)
+  #         source switch_env openvla-oft
+  #         cp -r /workspace/dataset/maniskill_assets/assets ${REPO_PATH}/rlinf/envs/maniskill/
+  #         bash tests/e2e_tests/embodied/run.sh maniskill_grpo_openvlaoft 2>&1 | tee /tmp/test_output.log
 
-  embodied-libero-spatial-ppo-openpi05-test:
-    runs-on: image-test
-    defaults:
-      run:
-        shell: bash
-    container:
-      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
-      volumes:
-        - /workspace/dataset:/workspace/dataset
-      options: --rm -it --gpus="all" --shm-size=2g
-    steps:
-      - name: OPENPI test
-        timeout-minutes: 20
-        run: |
-          export REPO_PATH=$(pwd)
-          source switch_env openpi
-          bash tests/e2e_tests/embodied/run.sh libero_spatial_ppo_openpi05 2>&1 | tee /tmp/test_output.log
+  # embodied-libero-goal-grpo-openvlaoft-test:
+  #   runs-on: image-test
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   container:
+  #     image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+  #     volumes:
+  #       - /workspace/dataset:/workspace/dataset
+  #     options: --rm -it --gpus="all" --shm-size=2g
+  #   steps:
+  #     - name: OpenVLA-OFT test
+  #       timeout-minutes: 20
+  #       run: |
+  #         export REPO_PATH=$(pwd)
+  #         source switch_env openvla-oft
+  #         bash tests/e2e_tests/embodied/run.sh libero_goal_grpo_openvlaoft 2>&1 | tee /tmp/test_output.log
 
-  embodied-behavior-ppo-openvlaoft-test:
-    runs-on: image-test
-    container:
-      image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
-      volumes:
-        - /workspace/dataset:/workspace/dataset
-      options: --rm -it --gpus="all" --shm-size=2g
-    steps:
-      - name: BEHAVIOR-OpenVLA-OFT test
-        timeout-minutes: 20
-        run: |
-          export REPO_PATH=$(pwd)
-          export OMNIGIBSON_DATA_PATH=/workspace/dataset/behavior-datasets
-          export ISAAC_PATH=/workspace/dataset/isaac-sim
-          source switch_env behavior-openvla-oft
-          bash tests/e2e_tests/embodied/run.sh behavior_ppo_openvlaoft
+  # embodied-libero-130-grpo-openvlaoft-test:
+  #   runs-on: image-test
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   container:
+  #     image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+  #     volumes:
+  #       - /workspace/dataset:/workspace/dataset
+  #     options: --rm -it --gpus="all" --shm-size=2g
+  #   steps:
+  #     - name: OpenVLA-OFT test
+  #       timeout-minutes: 20
+  #       run: |
+  #         export REPO_PATH=$(pwd)
+  #         source switch_env openvla-oft
+  #         bash tests/e2e_tests/embodied/run.sh libero_130_grpo_openvlaoft 2>&1 | tee /tmp/test_output.log
+
+  # embodied-libero-spatial-ppo-openpi-test:
+  #   runs-on: image-test
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   container:
+  #     image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+  #     volumes:
+  #       - /workspace/dataset:/workspace/dataset
+  #     options: --rm -it --gpus="all" --shm-size=2g
+  #   steps:
+  #     - name: OPENPI test
+  #       timeout-minutes: 20
+  #       run: |
+  #         export REPO_PATH=$(pwd)
+  #         source switch_env openpi
+  #         bash tests/e2e_tests/embodied/run.sh libero_spatial_ppo_openpi 2>&1 | tee /tmp/test_output.log
+
+  # embodied-libero-spatial-ppo-openpi05-test:
+  #   runs-on: image-test
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   container:
+  #     image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+  #     volumes:
+  #       - /workspace/dataset:/workspace/dataset
+  #     options: --rm -it --gpus="all" --shm-size=2g
+  #   steps:
+  #     - name: OPENPI test
+  #       timeout-minutes: 20
+  #       run: |
+  #         export REPO_PATH=$(pwd)
+  #         source switch_env openpi
+  #         bash tests/e2e_tests/embodied/run.sh libero_spatial_ppo_openpi05 2>&1 | tee /tmp/test_output.log
+
+  # embodied-behavior-ppo-openvlaoft-test:
+  #   runs-on: image-test
+  #   container:
+  #     image: rlinf/rlinf:agentic-rlinf0.1-torch2.6.0-openvla-openvlaoft-pi0
+  #     volumes:
+  #       - /workspace/dataset:/workspace/dataset
+  #     options: --rm -it --gpus="all" --shm-size=2g
+  #   steps:
+  #     - name: BEHAVIOR-OpenVLA-OFT test
+  #       timeout-minutes: 20
+  #       run: |
+  #         export REPO_PATH=$(pwd)
+  #         export OMNIGIBSON_DATA_PATH=/workspace/dataset/behavior-datasets
+  #         export ISAAC_PATH=/workspace/dataset/isaac-sim
+  #         source switch_env behavior-openvla-oft
+  #         bash tests/e2e_tests/embodied/run.sh behavior_ppo_openvlaoft
 
   # embodied-metaworld-50-ppo-openpi-test:
   #   runs-on: image-test
