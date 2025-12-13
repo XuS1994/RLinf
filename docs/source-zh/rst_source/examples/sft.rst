@@ -1,28 +1,27 @@
-
-Supervised Fine-Tuning (SFT)
-============================
+全量微调训练
+=======================
 
 .. |huggingface| image:: /_static/svg/hf-logo.svg
    :width: 16px
    :height: 16px
    :class: inline-icon
 
-This document explains how to run **full-parameter supervised fine-tuning (SFT)** in the RLinf framework. SFT is typically the first stage before RLHF / RLAIF: the model first imitates high-quality demonstrations, then reinforcement learning continues optimizing from that prior.
+本文档介绍如何在 RLinf 框架中进行 **全量监督微调（SFT）**。SFT 通常作为进入 RLHF / RLAIF 前的第一阶段：模型先模仿高质量示例，后续强化学习才能在良好先验上继续优化。
 
-This guide covers
+内容包括
 --------
 
-- How to configure RLinf for general SFT
-- How to start training on a single machine or multi-node cluster
-- How to monitor and evaluate results
+- 如何为通用 SFT 配置 RLinf
+- 如何在单机或多节点集群上启动训练
+- 如何监控与评估结果
 
 
-Supported datasets
+支持的数据集
 ------------------
 
-RLinf supports LeRobot-format datasets. Use **config_type** to specify the dataset type.
+RLinf 目前支持 LeRobot 格式的数据集，可以通过 **config_type** 指定不同的数据集类型。
 
-Currently supported dataset formats:
+目前支持的数据格式包括：
 
 - pi0_maniskill
 - pi0_libero
@@ -32,9 +31,9 @@ Currently supported dataset formats:
 - pi05_calvin
 - pi05_custom
 
-You can also customize the dataset format to train on a specific dataset. Refer to:
+也可通过自定义数据集格式来训练特定数据集，具体可参考以下文件
 
-#. In ``examples/sft/config/custom_sft_openpi.yaml``, specify the dataset format.
+#. 在``examples/sft/config/custom_sft_openpi.yaml``中，指定数据格。
 
    .. code:: yaml
 
@@ -42,7 +41,7 @@ You can also customize the dataset format to train on a specific dataset. Refer 
         openpi:
           config_name: "pi0_custom"
 
-#. In ``rlinf/models/embodiment/openpi/__init__.py``, set the dataset format to ``pi0_custom``.
+#. 在``rlinf/models/embodiment/openpi/__init__.py``中，指定数据格式为 ``pi0_custom``。
 
    .. code:: python
 
@@ -61,7 +60,7 @@ You can also customize the dataset format to train on a specific dataset. Refer 
           pytorch_weight_path="checkpoints/torch/pi0_base",
       ),
 
-#. In ``rlinf/models/embodiment/openpi/dataconfig/custom_dataconfig.py``, define the custom dataset config.
+#. 在``rlinf/models/embodiment/openpi/dataconfig/custom_dataconfig.py``中，定义自定义数据集的配置。
 
    .. code:: python
 
@@ -77,32 +76,32 @@ You can also customize the dataset format to train on a specific dataset. Refer 
               self.action_train_with_rotation_6d = False
 
 
-Training config
+训练配置
 ----------------------
 
-A full example config is in ``examples/sft/config/libero_sft_openpi.yaml``. Key fields:
+完整示例配置位于 ``examples/sft/config/libero_sft_openpi.yaml``，核心字段如下：
 
 .. code:: yaml
 
    cluster:
-     num_nodes: 1                 # number of physical machines
-     component_placement:         # component → GPU mapping
+     num_nodes: 1                 # 实际机器数量
+     component_placement:         # 组件 → GPU 映射
        actor: 0-3
 
 
-Launch scripts
+启动脚本
 -------------
 
-Start the Ray cluster first, then run the helper script:
+先启动 Ray 集群，然后执行辅助脚本：
 
 .. code:: bash
 
    cd /path_to_RLinf/ray_utils
-   bash start_ray.sh                 # start head + workers
+   bash start_ray.sh                 # 启动 head + workers
 
-   # return to repo root
+   # 回到仓库根目录
    bash examples/sft/train_embodied_sft.py --config libero_sft_openpi.yaml
 
-The same script works for general text SFT; just swap the config file.
+同一脚本也适用于通用文本 SFT，只需替换配置文件。
 
 
