@@ -33,60 +33,60 @@ RLinf 目前支持 LeRobot 格式的数据集，可以通过 **config_type** 指
 
 也可通过自定义数据集格式来训练特定数据集，具体可参考以下文件
 
-#. 在``examples/sft/config/custom_sft_openpi.yaml``中，指定数据格。
+1. 在``examples/sft/config/custom_sft_openpi.yaml``中，指定数据格。
 
-   .. code:: yaml
+.. code:: yaml
 
-      model:
-        openpi:
-          config_name: "pi0_custom"
+    model:
+    openpi:
+        config_name: "pi0_custom"
 
-#. 在``rlinf/models/embodiment/openpi/__init__.py``中，指定数据格式为 ``pi0_custom``。
+2. 在``rlinf/models/embodiment/openpi/__init__.py``中，指定数据格式为 ``pi0_custom``。
 
-   .. code:: python
+.. code:: python
 
-      TrainConfig(
-          name="pi0_custom",
-          model=pi0_config.Pi0Config(),
-          data=CustomDataConfig(
-              repo_id="physical-intelligence/custom_dataset",
-              base_config=DataConfig(
-                  prompt_from_task=True
-              ),  # we need language instruction
-              assets=AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets"),
-              raw_action_is_delta=True,  # True for delta action, False for abs_action
-              action_train_with_rotation_6d=False,
-          ),
-          pytorch_weight_path="checkpoints/torch/pi0_base",
-      ),
+    TrainConfig(
+        name="pi0_custom",
+        model=pi0_config.Pi0Config(),
+        data=CustomDataConfig(
+            repo_id="physical-intelligence/custom_dataset",
+            base_config=DataConfig(
+                prompt_from_task=True
+            ),  # we need language instruction
+            assets=AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets"),
+            raw_action_is_delta=True,  # True for delta action, False for abs_action
+            action_train_with_rotation_6d=False,
+        ),
+        pytorch_weight_path="checkpoints/torch/pi0_base",
+    ),
 
-#. 在``rlinf/models/embodiment/openpi/dataconfig/custom_dataconfig.py``中，定义自定义数据集的配置。
+3. 在``rlinf/models/embodiment/openpi/dataconfig/custom_dataconfig.py``中，定义自定义数据集的配置。
 
-   .. code:: python
+.. code:: python
 
-      class CustomDataConfig(DataConfig):
-          def __init__(self, *args, **kwargs):
-              super().__init__(*args, **kwargs)
-              self.repo_id = "physical-intelligence/custom_dataset"
-              self.base_config = DataConfig(
-                  prompt_from_task=True
-              )
-              self.assets = AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets")
-              self.raw_action_is_delta = True
-              self.action_train_with_rotation_6d = False
+    class CustomDataConfig(DataConfig):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.repo_id = "physical-intelligence/custom_dataset"
+            self.base_config = DataConfig(
+                prompt_from_task=True
+            )
+            self.assets = AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets")
+            self.raw_action_is_delta = True
+            self.action_train_with_rotation_6d = False
 
 
 训练配置
-----------------------
+-------------
 
 完整示例配置位于 ``examples/sft/config/libero_sft_openpi.yaml``，核心字段如下：
 
 .. code:: yaml
 
-   cluster:
-     num_nodes: 1                 # 实际机器数量
-     component_placement:         # 组件 → GPU 映射
-       actor: 0-3
+    cluster:
+        num_nodes: 1                 # 节点数
+        component_placement:         # 组件 → GPU 映射
+            actor: 0-3
 
 
 启动脚本

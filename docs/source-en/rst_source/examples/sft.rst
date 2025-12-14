@@ -1,6 +1,6 @@
 
 Supervised Fine-Tuning (SFT)
-============================
+==================================================
 
 .. |huggingface| image:: /_static/svg/hf-logo.svg
    :width: 16px
@@ -10,7 +10,7 @@ Supervised Fine-Tuning (SFT)
 This document explains how to run **full-parameter supervised fine-tuning (SFT)** in the RLinf framework. SFT is typically the first stage before RLHF / RLAIF: the model first imitates high-quality demonstrations, then reinforcement learning continues optimizing from that prior.
 
 This guide covers
---------
+------------------
 
 - How to configure RLinf for general SFT
 - How to start training on a single machine or multi-node cluster
@@ -34,51 +34,51 @@ Currently supported dataset formats:
 
 You can also customize the dataset format to train on a specific dataset. Refer to:
 
-#. In ``examples/sft/config/custom_sft_openpi.yaml``, specify the dataset format.
+1. In ``examples/sft/config/custom_sft_openpi.yaml``, specify the dataset format.
 
-   .. code:: yaml
+.. code:: yaml
 
-      model:
-        openpi:
-          config_name: "pi0_custom"
+  model:
+    openpi:
+      config_name: "pi0_custom"
 
-#. In ``rlinf/models/embodiment/openpi/__init__.py``, set the dataset format to ``pi0_custom``.
+2. In ``rlinf/models/embodiment/openpi/__init__.py``, set the dataset format to ``pi0_custom``.
 
-   .. code:: python
+.. code:: python
 
-      TrainConfig(
-          name="pi0_custom",
-          model=pi0_config.Pi0Config(),
-          data=CustomDataConfig(
-              repo_id="physical-intelligence/custom_dataset",
-              base_config=DataConfig(
-                  prompt_from_task=True
-              ),  # we need language instruction
-              assets=AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets"),
-              raw_action_is_delta=True,  # True for delta action, False for abs_action
-              action_train_with_rotation_6d=False,
-          ),
-          pytorch_weight_path="checkpoints/torch/pi0_base",
+  TrainConfig(
+      name="pi0_custom",
+      model=pi0_config.Pi0Config(),
+      data=CustomDataConfig(
+          repo_id="physical-intelligence/custom_dataset",
+          base_config=DataConfig(
+              prompt_from_task=True
+          ),  # we need language instruction
+          assets=AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets"),
+          raw_action_is_delta=True,  # True for delta action, False for abs_action
+          action_train_with_rotation_6d=False,
       ),
+      pytorch_weight_path="checkpoints/torch/pi0_base",
+  ),
 
-#. In ``rlinf/models/embodiment/openpi/dataconfig/custom_dataconfig.py``, define the custom dataset config.
+3. In ``rlinf/models/embodiment/openpi/dataconfig/custom_dataconfig.py``, define the custom dataset config.
 
-   .. code:: python
+.. code:: python
 
-      class CustomDataConfig(DataConfig):
-          def __init__(self, *args, **kwargs):
-              super().__init__(*args, **kwargs)
-              self.repo_id = "physical-intelligence/custom_dataset"
-              self.base_config = DataConfig(
-                  prompt_from_task=True
-              )
-              self.assets = AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets")
-              self.raw_action_is_delta = True
-              self.action_train_with_rotation_6d = False
+  class CustomDataConfig(DataConfig):
+    def __init__(self, *args, **kwargs):
+      super().__init__(*args, **kwargs)
+      self.repo_id = "physical-intelligence/custom_dataset"
+      self.base_config = DataConfig(
+          prompt_from_task=True
+      )
+      self.assets = AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets")
+      self.raw_action_is_delta = True
+      self.action_train_with_rotation_6d = False
 
 
 Training config
-----------------------
+----------------
 
 A full example config is in ``examples/sft/config/libero_sft_openpi.yaml``. Key fields:
 
@@ -91,7 +91,7 @@ A full example config is in ``examples/sft/config/libero_sft_openpi.yaml``. Key 
 
 
 Launch scripts
--------------
+---------------
 
 Start the Ray cluster first, then run the helper script:
 

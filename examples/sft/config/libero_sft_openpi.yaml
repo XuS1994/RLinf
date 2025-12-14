@@ -29,7 +29,7 @@ runner:
   save_interval: 10
 
 data:
-  data_path: "/mnt/mnt/public/xusi/openpi-main/data"
+  data_path: "/path/to/libero-data"
 
 algorithm:
   adv_type: gae
@@ -45,7 +45,7 @@ actor:
   # Override the default values in model/pi0
   model:
     precision: null
-    model_path: "/mnt/mnt/public/liuzhihao/openpi-main/checkpoints/torch/pi0_base"
+    model_path: "/path/to/pi0-model"
     num_action_chunks: 4 # interface for the env
     add_value_head: True
     openpi:

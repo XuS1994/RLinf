@@ -8,7 +8,7 @@ hydra:
     dir: .
   output_subdir: null
   searchpath:
-    - file://${oc.env:EMBODIED_PATH}/config/
+    - file://${oc.env:REPO_PATH}/examples/embodiment/config
 
 cluster:
   num_nodes: 1
@@ -23,13 +23,13 @@ runner:
     experiment_name: "test_openpi"
     logger_backends: ["tensorboard"] # wandb, swanlab
 
-  max_epochs: 1000
+  max_epochs: 2
   max_steps: -1
   val_check_interval: -1
   save_interval: 10
 
 data:
-  data_path: "/workspace/dataset/data"
+  data_path: "/workspace/dataset/data/sft-ci-data"
 
 algorithm:
   adv_type: gae
@@ -45,7 +45,7 @@ actor:
   # Override the default values in model/pi0
   model:
     precision: null
-    model_path: "/workspace/dataset/pi0_libero"
+    model_path: "/workspace/dataset/pi0_maniskill"
     num_action_chunks: 4 # interface for the env
     add_value_head: True
     openpi:

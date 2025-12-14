@@ -18,13 +18,15 @@ jobs:
           export UV_CACHE_DIR=/workspace/dataset/.uv_cache
           export UV_PYTHON_INSTALL_DIR=/workspace/dataset/.uv_python
           export LIBERO_PATH=/workspace/dataset/LIBERO
-          bash requirements/install.sh embodied --model openvla --env maniskill_libero
+          bash requirements/install.sh embodied --model openpi --env maniskill_libero
 
       - name: SFT ManiSkill OpenPI test
         timeout-minutes: 20
         run: |
           export REPO_PATH=$(pwd)
           source .venv/bin/activate
+          uv pip install datasets==3.6.0
+          uv pip uninstall torchcodec
           bash tests/e2e_tests/sft/run.sh maniskill_sft_openpi
 
       - name: Clean up
