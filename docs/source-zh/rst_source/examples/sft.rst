@@ -1,4 +1,4 @@
-全量微调训练
+监督微调训练
 =======================
 
 .. |huggingface| image:: /_static/svg/hf-logo.svg
@@ -6,12 +6,12 @@
    :height: 16px
    :class: inline-icon
 
-本文档介绍如何在 RLinf 框架中进行 **全量监督微调（SFT）**。SFT 通常作为进入 RLHF / RLAIF 前的第一阶段：模型先模仿高质量示例，后续强化学习才能在良好先验上继续优化。
+本文档介绍如何在 RLinf 框架中进行 **全量监督微调（Full-parameter SFT）** 和 **LoRA 微调**。SFT 通常作为进入强化学习前的第一阶段：模型先模仿高质量示例，后续强化学习才能在良好先验上继续优化。
 
 内容包括
 --------
 
-- 如何为通用 SFT 配置 RLinf
+- 如何在 RLinf 中配置通用全量监督微调 和 LoRA微调
 - 如何在单机或多节点集群上启动训练
 - 如何监控与评估结果
 
@@ -29,7 +29,6 @@ RLinf 目前支持 LeRobot 格式的数据集，可以通过 **config_type** 指
 - pi05_maniskill
 - pi05_metaworld
 - pi05_calvin
-- pi05_custom
 
 也可通过自定义数据集格式来训练特定数据集，具体可参考以下文件
 
@@ -88,6 +87,14 @@ RLinf 目前支持 LeRobot 格式的数据集，可以通过 **config_type** 指
         component_placement:         # 组件 → GPU 映射
             actor: 0-3
 
+若需要支持LoRA微调，需要将``actor.model.is_lora``设置为True，并配置``actor.model.lora_rank``参数。
+
+.. code:: yaml
+
+    actor:
+        model:
+            is_lora: True
+            lora_rank: 32
 
 启动脚本
 -------------
