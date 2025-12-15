@@ -5,7 +5,7 @@ on:
 
 jobs:
   embodied-openvla-maniskill-libero-test:
-    runs-on: embodied
+    runs-on: idle-resource
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -33,7 +33,7 @@ jobs:
           uv cache prune
           
   embodied-openvlaoft-maniskill-libero-test:
-    runs-on: embodied
+    runs-on: idle-resource
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -76,7 +76,7 @@ jobs:
           uv cache prune
 
   embodied-openvlaoft-behavior-test:
-    runs-on: embodied
+    runs-on: idle-resource
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -106,7 +106,7 @@ jobs:
           uv cache prune
 
   embodied-openpi-maniskill-libero-test:
-    runs-on: embodied
+    runs-on: idle-resource
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -141,7 +141,7 @@ jobs:
           uv cache prune
 
   embodied-openpi-metaworld-test:
-    runs-on: embodied
+    runs-on: idle-resource
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
