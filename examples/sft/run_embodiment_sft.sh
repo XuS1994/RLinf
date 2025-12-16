@@ -7,11 +7,6 @@ export SRC_FILE="${EMBODIED_PATH}/train_embodied_sft.py"
 export MUJOCO_GL="egl"
 export PYOPENGL_PLATFORM="egl"
 
-unset HF_LEROBOT_HOME
-# export HF_LEROBOT_HOME="/mnt/mnt/public/xusi/openpi-main/data"
-
-# NOTE: set LIBERO_REPO_PATH to the path of the LIBERO repo
-export LIBERO_REPO_PATH="/opt/libero"
 export PYTHONPATH=${REPO_PATH}:${LIBERO_REPO_PATH}:$PYTHONPATH
 
 if [ -z "$1" ]; then

@@ -18,7 +18,6 @@ import jax
 import numpy as np
 import torch
 from omegaconf import DictConfig
-from torch.distributed.device_mesh import init_device_mesh
 
 import rlinf.algorithms  # noqa: F401
 from rlinf.config import SupportedModel
@@ -39,7 +38,7 @@ from rlinf.utils.utils import (
 )
 
 
-class SFTactor(FSDPModelManager, Worker):
+class FSDPSftWorker(FSDPModelManager, Worker):
     def __init__(self, cfg: DictConfig):
         Worker.__init__(self)
         super().__init__(cfg.actor, self._world_size, self._rank)
@@ -47,9 +46,6 @@ class SFTactor(FSDPModelManager, Worker):
         self.cfg = cfg
         torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
         self.device = torch.cuda.current_device()
-        self.device_mesh = init_device_mesh(
-            "cuda", mesh_shape=(self._world_size,), mesh_dim_names=["fsdp"]
-        )
 
         self._component_placement = HybridComponentPlacement(cfg, Cluster())
         self.data_loader, self.data_config = self.build_dataloader()
@@ -77,6 +73,7 @@ class SFTactor(FSDPModelManager, Worker):
             config = get_openpi_config(
                 self.cfg.actor.model.openpi.config_name,
                 model_path=self.cfg.actor.model.model_path,
+                batch_size=self.cfg.actor.micro_batch_size * self._world_size,
             )
             data_loader = openpi_data_loader.create_data_loader(
                 config, framework="pytorch", shuffle=True
@@ -123,9 +120,9 @@ class SFTactor(FSDPModelManager, Worker):
                     .contiguous()
                     .clone(),
                     observation,
-                )  # noqa: PLW2901
-                actions = actions.to(torch.float32)  # noqa: PLW2901
-                actions = actions.to(self.device)  # noqa: PLW2
+                )
+                actions = actions.to(torch.float32)
+                actions = actions.to(self.device)
 
                 self.optimizer.zero_grad(set_to_none=True)
                 with self.amp_context:

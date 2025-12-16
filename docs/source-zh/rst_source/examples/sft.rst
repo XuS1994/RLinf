@@ -53,8 +53,8 @@ RLinf 目前支持 LeRobot 格式的数据集，可以通过 **config_type** 指
                 prompt_from_task=True
             ),  # we need language instruction
             assets=AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets"),
-            raw_action_is_delta=True,  # True for delta action, False for abs_action
-            action_train_with_rotation_6d=False,
+            extra_delta_transform=True,  # True for delta action, False for abs_action
+            action_train_with_rotation_6d=False,  # User can add extra config in custom dataset
         ),
         pytorch_weight_path="checkpoints/torch/pi0_base",
     ),
@@ -71,7 +71,7 @@ RLinf 目前支持 LeRobot 格式的数据集，可以通过 **config_type** 指
                 prompt_from_task=True
             )
             self.assets = AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets")
-            self.raw_action_is_delta = True
+            self.extra_delta_transform = True
             self.action_train_with_rotation_6d = False
 
 

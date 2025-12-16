@@ -25,7 +25,6 @@ jobs:
         run: |
           export REPO_PATH=$(pwd)
           source .venv/bin/activate
-          uv pip install datasets==3.6.0
           uv pip uninstall torchcodec
           bash tests/e2e_tests/sft/run.sh maniskill_sft_openpi
 

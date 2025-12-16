@@ -23,7 +23,7 @@ from rlinf.config import validate_cfg
 from rlinf.runners.sft_runner import SFTRunner
 from rlinf.scheduler import Cluster
 from rlinf.utils.placement import HybridComponentPlacement
-from rlinf.workers.actor.fsdp_sft_worker import SFTactor
+from rlinf.workers.sft.fsdp_sft_worker import FSDPSftWorker
 
 mp.set_start_method("spawn", force=True)
 
@@ -42,7 +42,7 @@ def main(cfg) -> None:
 
     # Create actor worker group
     actor_placement = component_placement.get_strategy("actor")
-    actor_group = SFTactor.create_group(cfg).launch(
+    actor_group = FSDPSftWorker.create_group(cfg).launch(
         cluster, name=cfg.actor.group_name, placement_strategy=actor_placement
     )
 

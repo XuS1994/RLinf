@@ -64,17 +64,6 @@ class ManiSkillInputs(transforms.DataTransformFn):
             ...
         """
 
-        # Possibly need to parse images to uint8 (H,W,C) since LeRobot automatically
-        # stores as float32 (C,H,W), gets skipped for policy inference.
-        # Keep this for your own dataset, but if your dataset stores the images
-        # in a different key than "observation/image" or "observation/wrist_image",
-        # you should change it below.
-        # Pi0 models support three image inputs at the moment: one third-person view,
-        # and two wrist views (left and right).
-        # If your dataset does not have a particular type
-        # of image, e.g. wrist images, you can comment it out here and
-        # replace it with zeros like we do for the
-        # right wrist image below.
         base_image = _parse_image(data["observation/image"])
 
         # Create inputs dict. Do not change the keys in the dict below.
@@ -105,10 +94,6 @@ class ManiSkillInputs(transforms.DataTransformFn):
         if "prompt" in data:
             inputs["prompt"] = data["prompt"]
 
-        # print(f"inputs={inputs.keys()}")
-
-        # print(f"inputs/image/base_0_rgb={inputs['image']['base_0_rgb'].shape}, {inputs['image']['base_0_rgb'].dtype}")
-        # print(f"inputs/state={inputs['state'].shape}, {inputs['state'].dtype}")
         return inputs
 
 

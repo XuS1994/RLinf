@@ -185,8 +185,8 @@ _CONFIGS = [
                 prompt_from_task=True
             ),  # we need language instruction
             assets=AssetsConfig(assets_dir="checkpoints/torch/pi0_base/assets"),
-            raw_action_is_delta=True,  # True for delta action, False for abs_action
-            action_train_with_rotation_6d=False,
+            extra_delta_transform=False,  # True for delta action, False for abs_action
+            action_train_with_rotation_6d=False,  # User can add extra config in custom dataset
         ),
         pytorch_weight_path="checkpoints/torch/pi0_base",
     ),
@@ -224,7 +224,7 @@ def _override_with_model_path(config: TrainConfig, model_path: str) -> TrainConf
 
 
 def get_openpi_config(
-    config_name: str, model_path: Optional[str] = None
+    config_name: str, model_path: Optional[str] = None, batch_size: Optional[int] = None
 ) -> TrainConfig:
     """Get a config by name."""
     if config_name not in _CONFIGS_DICT:
@@ -237,5 +237,7 @@ def get_openpi_config(
     config = _CONFIGS_DICT[config_name]
     if model_path is not None:
         config = _override_with_model_path(config, model_path)
+    if batch_size is not None:
+        config = dataclasses.replace(config, batch_size=batch_size)
 
     return config

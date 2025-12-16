@@ -23,22 +23,18 @@ from rlinf.utils.distributed import ScopedTimer
 from rlinf.utils.metric_logger import MetricLogger
 from rlinf.utils.metric_utils import compute_evaluate_metrics
 from rlinf.utils.runner_utils import check_progress
-from rlinf.workers.actor.fsdp_sft_worker import SFTactor
+from rlinf.workers.sft.fsdp_sft_worker import FSDPSftWorker
 
 
 class SFTRunner:
     def __init__(
         self,
         cfg: DictConfig,
-        actor: SFTactor,
-        critic: Optional[object] = None,
-        reward: Optional[object] = None,
+        actor: FSDPSftWorker,
         run_timer: Optional[ScopedTimer] = None,
     ) -> None:
         self.cfg = cfg
         self.actor = actor
-        self.critic = critic
-        self.reward = reward
 
         # this timer checks if we should stop training
         self.run_timer = run_timer

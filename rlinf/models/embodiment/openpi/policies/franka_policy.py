@@ -54,10 +54,6 @@ class FrankaEEOutputs(transforms.DataTransformFn):
     action_train_with_rotation_6d: bool = False
 
     def __call__(self, data: dict) -> dict:
-        # Only return the first N actions -- since we padded actions above to fit the model action
-        # dimension, we need to now parse out the correct number of actions in the return dict.
-        # For Libero, we only return the first 7 actions (since the rest is padding).
-        # For your own dataset, replace `7` with the action dimension of your dataset.
         return {
             "actions": np.asarray(data["actions"][:, :7])
         }  # use abs actions [x,y,z,rx,ry,rz,gripper] for Franka
@@ -84,11 +80,6 @@ class FrankaEEInputs(transforms.DataTransformFn):
     action_train_with_rotation_6d: bool = False
 
     def __call__(self, data: dict) -> dict:
-        # We pad the proprioceptive input to the action dimension of the model.
-        # For pi0-FAST, we don't pad the state. For Libero, we don't need to differentiate
-        # since the pi0-FAST action_dim = 7, which is < state_dim = 8, so pad is skipped.
-        # Keep this for your own dataset, but if your dataset stores the proprioceptive input
-        # in a different key than "observation/state", you should change it below.
         assert data["observation/state"].shape == (7,), (
             f"Expected state shape (7,), got {data['observation/state'].shape}"
         )
@@ -100,15 +91,6 @@ class FrankaEEInputs(transforms.DataTransformFn):
         state = data["observation/state"]
         state = transforms.pad_to_dim(state, self.action_dim)
 
-        # Possibly need to parse images to uint8 (H,W,C) since LeRobot automatically
-        # stores as float32 (C,H,W), gets skipped for policy inference
-        # Keep this for your own dataset, but if your dataset stores the images
-        # in a different key than "observation/image" or "observation/wrist_image",
-        # you should change it below.
-        # Pi0 models support three image inputs at the moment: one third-person view,
-        # and two wrist views (left and right). If your dataset does not have a particular type
-        # of image, e.g. wrist images, you can comment it out here and replace it with zeros like we do for the
-        # right wrist image below.
         base_image = _parse_image(data["observation/image"])
 
         # We only mask padding for pi0 model, not pi0-FAST.
@@ -141,9 +123,6 @@ class FrankaEEInputs(transforms.DataTransformFn):
         # Pad actions to the model action dimension. Keep this for your own dataset.
         # Actions are only available during training.
         if "actions" in data:
-            # We are padding to the model action dim.
-            # For pi0-FAST, this is a no-op (since action_dim = 7).
-            # maybe should transfer
             assert len(data["actions"].shape) == 2 and data["actions"].shape[-1] == 7, (
                 f"Expected actions shape (N, 7), got {data['actions'].shape}"
             )
