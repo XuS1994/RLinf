@@ -119,7 +119,8 @@ jobs:
       unit-tests,
       agent-reason-e2e-tests,
       embodied-e2e-tests,
-      scheduler-tests
+      scheduler-tests,
+      sft-e2e-tests
     ]
     if: always()
     runs-on: ubuntu-latest
