@@ -37,8 +37,8 @@ algorithm:
 actor:
   group_name: "ActorGroup"
   training_backend: "fsdp"
-  micro_batch_size: 4   # micro batch size = 4 * 8 gpus = 32
-  global_batch_size: 32
+  micro_batch_size: 4
+  global_batch_size: 128
   seed: 0
 
   # Override the default values in model/pi0
