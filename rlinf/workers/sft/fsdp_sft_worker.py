@@ -38,7 +38,6 @@ class FSDPSftWorker(FSDPModelManager, Worker):
         super().__init__(cfg.actor, self._world_size, self._rank)
 
         self.cfg = cfg
-        self._logger = get_logger()
         torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
         self.device = torch.cuda.current_device()
 
