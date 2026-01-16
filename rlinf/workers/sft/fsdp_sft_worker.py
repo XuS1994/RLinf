@@ -21,22 +21,15 @@ from omegaconf import DictConfig
 
 import rlinf.algorithms  # noqa: F401
 from rlinf.config import SupportedModel
-from rlinf.hybrid_engines.fsdp.fsdp_model_manager import (
-    FSDPModelManager,
-)
+from rlinf.hybrid_engines.fsdp.fsdp_model_manager import FSDPModelManager
 from rlinf.models import get_model
 from rlinf.models.embodiment.base_policy import ForwardType
 from rlinf.scheduler import Cluster, Worker
 from rlinf.utils.distributed import all_reduce_dict
-from rlinf.utils.metric_utils import (
-    append_to_dict,
-)
-from rlinf.utils.placement import (
-    HybridComponentPlacement,
-)
-from rlinf.utils.utils import (
-    clear_memory,
-)
+from rlinf.utils.logging import get_logger
+from rlinf.utils.metric_utils import append_to_dict
+from rlinf.utils.placement import HybridComponentPlacement
+from rlinf.utils.utils import clear_memory
 
 
 class FSDPSftWorker(FSDPModelManager, Worker):
@@ -45,6 +38,7 @@ class FSDPSftWorker(FSDPModelManager, Worker):
         super().__init__(cfg.actor, self._world_size, self._rank)
 
         self.cfg = cfg
+        self._logger = get_logger()
         torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
         self.device = torch.cuda.current_device()
 
@@ -110,7 +104,7 @@ class FSDPSftWorker(FSDPModelManager, Worker):
 
             metrics = {}
 
-            total_loss = 0.0
+            avg_loss = 0.0
             for idx in range(self.gradient_accumulation):
                 backward_ctx = self.before_micro_batch(
                     self.model,
@@ -140,29 +134,11 @@ class FSDPSftWorker(FSDPModelManager, Worker):
                         )
                     loss = losses.mean()
 
-                total_loss += loss.item()
                 loss = loss / self.gradient_accumulation
+                avg_loss += loss.item()
                 with backward_ctx:
                     self.grad_scaler.scale(loss).backward()
 
-            # Manual gradient sync (temporary fix)
-            torch.cuda.synchronize()
-            if torch.distributed.is_initialized():
-                all_grads = []
-                for name, param in self.model.named_parameters():
-                    if param.grad is not None:
-                        all_grads.append((name, param.grad))
-                process_group = getattr(self.model, "process_group", None)
-                for name, grad in all_grads:
-                    torch.distributed.all_reduce(
-                        grad, op=torch.distributed.ReduceOp.AVG, group=process_group
-                    )
-                process_group = getattr(self.model, "process_group", None)
-                torch.distributed.barrier(
-                    group=process_group, device_ids=[torch.cuda.current_device()]
-                )
-
-            avg_loss = total_loss / self.gradient_accumulation
             grad_norm, lr_list = self.optimizer_step()
             self.optimizer.zero_grad(set_to_none=True)
 
