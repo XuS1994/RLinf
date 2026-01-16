@@ -73,7 +73,7 @@ class BehaviorInputs(transforms.DataTransformFn):
 
         # Create inputs dict. Do not change the keys in the dict below.
         inputs = {
-            "state": data["observation/state"][:32], # norm state has dimension [32]
+            "state": data["observation/state"][:32],  # norm state has dimension [32]
             "image": {
                 "base_0_rgb": base_image,
                 "left_wrist_0_rgb": wrist_image[0, ...],
