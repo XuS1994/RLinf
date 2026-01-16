@@ -379,7 +379,10 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch, BasePolicy):
             observation, mode=mode, compute_values=compute_values
         )
         actions = self.output_transform(
-            {"actions": outputs["actions"], "state": observation.state}
+            {
+                "actions": outputs["actions"],
+                "state": observation.state[: self.config.proprio_dim],
+            }
         )["actions"].numpy()
 
         forward_inputs = {

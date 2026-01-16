@@ -137,7 +137,7 @@ class BehaviorEnv(gym.Env):
             "wrist_images": torch.stack(
                 [left_image, right_image], axis=0
             ),  # [N_IMG, H, W, C]
-            "state": state[:32],  # norm state has dimension [32]
+            "state": state,
         }
 
     def _wrap_obs(self, obs_list):

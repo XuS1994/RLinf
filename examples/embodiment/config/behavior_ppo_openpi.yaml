@@ -120,6 +120,7 @@ actor:
     model_path: "/path/to/model/RLinf-Pi0-SFT"
     add_value_head: True
     num_images_in_input: 3
+    proprio_dim: 32
     openpi:
       config_name: "pi0_behavior"
       detach_critic_input: True
