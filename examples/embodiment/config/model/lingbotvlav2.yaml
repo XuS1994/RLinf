@@ -1,6 +1,7 @@
 model_type: lingbotvlav2
-model_path: ${oc.env:LINGBOT_VLA_V2_CKPT}
-tokenizer_path: ${oc.env:QWEN3_VL_PATH}
+# Fill in absolute paths for the model and its assets before running.
+model_path: ""
+tokenizer_path: ""
 precision: bf16
 num_action_chunks: 50
 action_dim: 14
@@ -25,7 +26,7 @@ value_head:
   activation: relu
 lingbotvlav2:
   data_parallel_backend: fsdp2
-  training_config_path: ${oc.env:LINGBOT_VLA_V2_TRAIN_CONFIG}
-  robot_config_path: ${oc.env:LINGBOT_VLA_V2_PATH}/configs/robot_configs/robotwin.yaml
-  stats_path: ${oc.env:LINGBOT_VLA_V2_PATH}/assets/norm_stats/robotwin.json
+  training_config_path: ""
+  robot_config_path: ""
+  stats_path: ""
   attention_implementation: eager

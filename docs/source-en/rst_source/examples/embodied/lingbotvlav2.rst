@@ -28,7 +28,6 @@ Create a dedicated environment for LingbotVLA 2.0:
    bash requirements/install.sh embodied --model lingbotvlav2 --env robotwin \
      --venv .venv-lingbotvlav2 --torch 2.9.0 --transformers 4.57.6
    source .venv-lingbotvlav2/bin/activate
-   export LINGBOT_VLA_V2_PATH="$VIRTUAL_ENV/lingbot-vla-v2"
 
 To build a Docker image with the same dependencies:
 
@@ -63,9 +62,18 @@ Download the V2 RoboTwin checkpoint and Qwen3-VL backbone:
    hf download Qwen/Qwen3-VL-4B-Instruct \
      --local-dir "$MODEL_ROOT/Qwen3-VL-4B-Instruct"
 
-   export LINGBOT_VLA_V2_CKPT="$MODEL_ROOT/lingbot-vla-v2-6b-robotwin/checkpoints/global_step_50000/hf_ckpt"
-   export LINGBOT_VLA_V2_TRAIN_CONFIG="$MODEL_ROOT/lingbot-vla-v2-6b-robotwin/lingbotvla_cli.yaml"
-   export QWEN3_VL_PATH="$MODEL_ROOT/Qwen3-VL-4B-Instruct"
+After downloading, fill in the empty fields in
+``examples/embodiment/config/model/lingbotvlav2.yaml`` with your absolute paths.
+Training and standalone evaluation share this file:
+
+.. code-block:: yaml
+
+   model_path: /path/to/models/lingbot-vla-v2-6b-robotwin/checkpoints/global_step_50000/hf_ckpt
+   tokenizer_path: /path/to/models/Qwen3-VL-4B-Instruct
+   lingbotvlav2:
+     training_config_path: /path/to/models/lingbot-vla-v2-6b-robotwin/lingbotvla_cli.yaml
+     robot_config_path: /path/to/RLinf/.venv-lingbotvlav2/lingbot-vla-v2/configs/robot_configs/robotwin.yaml
+     stats_path: /path/to/RLinf/.venv-lingbotvlav2/lingbot-vla-v2/assets/norm_stats/robotwin.json
 
 Run It
 ------
@@ -77,7 +85,9 @@ From the RLinf repository, launch the PPO configuration:
    cd "$RLINF_PATH"
    bash examples/embodiment/run_embodiment.sh robotwin_click_bell_ppo_lingbotvlav2 ALOHA
 
-To resume, append ``runner.resume_dir=/path/to/checkpoints/global_step_N``.
+To resume, set ``runner.resume_dir`` in
+``examples/embodiment/config/robotwin_click_bell_ppo_lingbotvlav2.yaml`` to a saved
+checkpoint directory.
 Monitor ``env/success_once`` in TensorBoard.
 
 Evaluation
