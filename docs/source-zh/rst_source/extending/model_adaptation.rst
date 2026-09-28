@@ -81,7 +81,7 @@
 安装与验证
 ----------
 
-使用 ``requirements/install.sh`` 及公共依赖 helpers，为新增模型固定包版本或源码 revision。所需接口尚未发布时，保留版本化补丁、文件哈希、源码来源和许可证声明，拒绝覆盖冲突的用户改动。V2 使用 ``requirements/embodied/models/lingbotvlav2/source.json`` 和 ``ppo-compat.patch``；Docker 与 CI 复用同一安装器。其他模型历史上较宽松的版本固定方式，应单独验证后再调整。
+使用 ``requirements/install.sh`` 及公共依赖 helpers，为新增模型固定包版本或源码 revision。所需接口尚未发布时，保留版本化补丁、源码来源和许可证声明。V2 在 ``requirements/install.sh`` 中固定源码 revision，通过 Git 应用 ``requirements/embodied/models/lingbotvlav2/ppo-compat.patch``，并在应用前拒绝冲突改动。Docker 与 CI 复用同一安装器。其他模型历史上较宽松的版本固定方式，应单独验证后再调整。
 
 验证 checkpoint 加载、预处理、rollout/actor 概率一致性、梯度有限、可训练参数范围、optimizer 更新、权重同步和续训。独立评估需要完整的 ``rollout.model``；导出上游部署格式需另做加载测试。中英文说明及 Docker/CI 应保持一致，并明确实际执行的验证项。
 

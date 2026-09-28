@@ -1276,7 +1276,7 @@ def test_apxinf_a_missing_apxinf_robo_names_what_to_install(monkeypatch):
 
 @pytest.mark.parametrize("step", [0, 4, 9])
 def test_lingbotvlav2_sde_has_finite_first_and_last_step_density(step):
-    from rlinf.models.embodiment.lingbotvlav2.lingbotvlav2_action_model import (
+    from rlinf.models.embodiment.lingbotvlav2.utils import (
         flow_sde_transition,
         gaussian_logprob,
     )
@@ -1300,7 +1300,7 @@ def test_lingbotvlav2_sde_has_finite_first_and_last_step_density(step):
 
 
 def test_lingbotvlav2_zero_noise_recovers_flow_ode():
-    from rlinf.models.embodiment.lingbotvlav2.lingbotvlav2_action_model import (
+    from rlinf.models.embodiment.lingbotvlav2.utils import (
         flow_sde_transition,
     )
 

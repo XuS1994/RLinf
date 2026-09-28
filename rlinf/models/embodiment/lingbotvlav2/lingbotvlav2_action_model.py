@@ -21,45 +21,36 @@ from typing import Any
 import torch
 import torch.nn as nn
 import yaml
+from lingbotvla.checkpoint_metadata import (
+    build_checkpoint_config,
+    read_checkpoint_config,
+)
+from lingbotvla.data.vla_data.utils import FeatureTransform
+from lingbotvla.distributed.parallel_state import (
+    get_parallel_state,
+    init_parallel_state,
+)
+from lingbotvla.models import build_processor
+from lingbotvla.models.vla.lingbot_vla.modeling_lingbot_vla_v2 import (
+    LingbotVlaV2Policy,
+)
+from lingbotvla.models.vla.lingbot_vla.qwen2_action_expert import (
+    apply_lingbot_qwen2_patch,
+)
+from lingbotvla.models.vla.lingbot_vla.qwen3vl_in_vla import (
+    apply_lingbot_qwen3_vl_patch,
+)
 from omegaconf import DictConfig
+from safetensors.torch import load_model
+from transformers.modeling_utils import load_sharded_checkpoint
 
 from rlinf.models.embodiment.base_policy import BasePolicy, ForwardType
+from rlinf.models.embodiment.lingbotvlav2.utils import (
+    flow_sde_transition,
+    gaussian_logprob,
+)
 from rlinf.models.embodiment.modules.value_head import ValueHead
 from rlinf.utils.logging import get_logger
-
-
-def flow_sde_transition(
-    x: torch.Tensor,
-    velocity: torch.Tensor,
-    time: torch.Tensor,
-    delta: torch.Tensor,
-    noise_level: float,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Return the FP32 Gaussian transition used by sampling and PPO replay.
-
-    At t=1 the diffusion denominator uses the next time, as in RLinf's
-    LingBot-VLA/OpenPI flow-SDE. Every step has positive variance, including
-    the final step. Scores are densities of the complete latent path.
-    """
-    x, velocity = x.float(), velocity.float()
-    denominator = torch.where(time == 1, delta, 1 - time)
-    sigma_squared = noise_level**2 * time / denominator
-    mean = (
-        x
-        - delta * velocity
-        - sigma_squared * delta / (2 * time) * (x + (1 - time) * velocity)
-    )
-    std = torch.sqrt(delta * sigma_squared)
-    return mean, std
-
-
-def gaussian_logprob(
-    sample: torch.Tensor, mean: torch.Tensor, std: torch.Tensor
-) -> torch.Tensor:
-    """Score a detached continuous sample without reducing latent dimensions."""
-    return torch.distributions.Normal(mean.float(), std.float()).log_prob(
-        sample.float()
-    )
 
 
 class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
@@ -87,28 +78,6 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
 
     def __init__(self, config: DictConfig, torch_dtype: torch.dtype):
         super().__init__()
-        from lingbotvla.checkpoint_metadata import (
-            build_checkpoint_config,
-            read_checkpoint_config,
-        )
-        from lingbotvla.data.vla_data.utils import FeatureTransform
-        from lingbotvla.distributed.parallel_state import (
-            get_parallel_state,
-            init_parallel_state,
-        )
-        from lingbotvla.models import build_processor
-        from lingbotvla.models.vla.lingbot_vla.modeling_lingbot_vla_v2 import (
-            LingbotVlaV2Policy,
-        )
-        from lingbotvla.models.vla.lingbot_vla.qwen2_action_expert import (
-            apply_lingbot_qwen2_patch,
-        )
-        from lingbotvla.models.vla.lingbot_vla.qwen3vl_in_vla import (
-            apply_lingbot_qwen3_vl_patch,
-        )
-        from safetensors.torch import load_model
-        from transformers.modeling_utils import load_sharded_checkpoint
-
         self.config = config
         self.torch_dtype = torch_dtype
         self.num_steps = int(config.num_steps)
@@ -126,6 +95,8 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
             raise ValueError("V2 LoRA is not supported")
         if config.lingbotvlav2.data_parallel_backend != "fsdp2":
             raise ValueError("V2 currently requires the FSDP2 training backend")
+        # Rollout and standalone evaluation workers have no process group.
+        # Actors initialize theirs before constructing the model.
         if torch.distributed.is_initialized():
             # RLinf owns the process group and parameter sharding. The native
             # MoE runtime still needs a matching topology to disable EP/TP.

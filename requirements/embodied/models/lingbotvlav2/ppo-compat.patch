@@ -3,7 +3,7 @@ diff --git a/lingbotvla/data/__init__.py b/lingbotvla/data/__init__.py
 +++ b/lingbotvla/data/__init__.py
 @@ -1,3 +1,6 @@
 +# Modified for RLinf: lazy dataset imports and PPO-compatible MoE replay.
-+# See requirements/embodied/models/lingbotvlav2/README.md in RLinf.
++# Licensed under Apache-2.0; see LICENSE in RLinf.
 +
  # Copyright 2025 Bytedance Ltd. and/or its affiliates
  #
@@ -70,7 +70,7 @@ diff --git a/lingbotvla/data/vla_data/__init__.py b/lingbotvla/data/vla_data/__i
 -from .multi_vla_dataset import MultiVLADataset
 \ No newline at end of file
 +# Modified for RLinf: lazy dataset imports and PPO-compatible MoE replay.
-+# See requirements/embodied/models/lingbotvlav2/README.md in RLinf.
++# Licensed under Apache-2.0; see LICENSE in RLinf.
 +
 +"""VLA transforms remain usable without loading offline dataset dependencies."""
 +
@@ -92,7 +92,7 @@ diff --git a/lingbotvla/models/vla/lingbot_vla/qwen2_action_expert.py b/lingbotv
 +++ b/lingbotvla/models/vla/lingbot_vla/qwen2_action_expert.py
 @@ -1,3 +1,6 @@
 +# Modified for RLinf: lazy dataset imports and PPO-compatible MoE replay.
-+# See requirements/embodied/models/lingbotvlav2/README.md in RLinf.
++# Licensed under Apache-2.0; see LICENSE in RLinf.
 +
  from logging import raiseExceptions
  import einops
@@ -248,7 +248,7 @@ diff --git a/lingbotvla/models/vla/lingbot_vla/modeling_lingbot_vla_v2.py b/ling
 +++ b/lingbotvla/models/vla/lingbot_vla/modeling_lingbot_vla_v2.py
 @@ -1,3 +1,6 @@
 +# Modified for RLinf: lazy dataset imports and PPO-compatible MoE replay.
-+# See requirements/embodied/models/lingbotvlav2/README.md in RLinf.
++# Licensed under Apache-2.0; see LICENSE in RLinf.
 +
  import einops
  import torch

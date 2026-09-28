@@ -16,9 +16,7 @@
 
 from __future__ import annotations
 
-import hashlib
 import importlib.util
-import json
 import math
 import os
 import subprocess
@@ -66,34 +64,27 @@ def model_source_patch(tmp_path):
         "--- a/model.py\n+++ b/model.py\n@@ -1 +1 @@\n"
         "-value = 1\n+value = 2\n"
     )
-    manifest = tmp_path / "source.json"
-    manifest.write_text(
-        json.dumps(
-            {
-                "revision": revision,
-                "patch": patch.name,
-                "files": {
-                    "model.py": {
-                        "before_sha256": hashlib.sha256(b"value = 1\n").hexdigest(),
-                        "after_sha256": hashlib.sha256(b"value = 2\n").hexdigest(),
-                    }
-                },
-            }
+    installer = (Path(__file__).parents[2] / "requirements/install.sh").read_text()
+    helper = installer.split("apply_model_source_patch() {", 1)[1].split("\n}", 1)[0]
+    script = "set -e\napply_model_source_patch() {" + helper + "\n}\n"
+    script += 'apply_model_source_patch "$@"\n'
+
+    def prepare(expected_revision=revision):
+        return subprocess.run(
+            ["bash", "-s", "--", str(source), expected_revision, str(patch)],
+            input=script,
+            text=True,
+            capture_output=True,
+            check=True,
         )
-    )
-    module_path = (
-        Path(__file__).parents[2] / "requirements/embodied/prepare_model_source.py"
-    )
-    spec = importlib.util.spec_from_file_location("prepare_model_source", module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return source, manifest, module.prepare_source, git
+
+    return source, patch, prepare, git
 
 
 def test_model_source_patch_is_idempotent(model_source_patch):
-    source, manifest, prepare, _ = model_source_patch
-    prepare(source, manifest)
-    prepare(source, manifest)
+    source, _, prepare, _ = model_source_patch
+    prepare()
+    prepare()
     assert (source / "model.py").read_text() == "value = 2\n"
 
 
@@ -101,37 +92,58 @@ def test_model_source_patch_is_idempotent(model_source_patch):
 def test_model_source_patch_preserves_conflicting_edits(
     model_source_patch, already_patched
 ):
-    source, manifest, prepare, _ = model_source_patch
+    source, _, prepare, _ = model_source_patch
     if already_patched:
-        prepare(source, manifest)
+        prepare()
     (source / "model.py").write_text("value = 99\n")
-    with pytest.raises(ValueError, match="Existing files were preserved"):
-        prepare(source, manifest)
+    with pytest.raises(subprocess.CalledProcessError) as exc:
+        prepare()
+    assert "Existing files were preserved" in exc.value.stderr
     assert (source / "model.py").read_text() == "value = 99\n"
 
 
 def test_model_source_patch_rejects_wrong_user_revision(model_source_patch):
-    source, manifest, prepare, git = model_source_patch
-    data = json.loads(manifest.read_text())
-    data["revision"] = "0" * 40
-    manifest.write_text(json.dumps(data))
+    source, _, prepare, git = model_source_patch
     before = git("rev-parse", "HEAD")
-    with pytest.raises(ValueError, match="Expected source revision"):
-        prepare(source, manifest)
+    with pytest.raises(subprocess.CalledProcessError) as exc:
+        prepare("0" * 40)
+    assert "Expected model source revision" in exc.value.stderr
     assert git("rev-parse", "HEAD") == before
     assert (source / "model.py").read_text() == "value = 1\n"
 
 
 def test_model_source_patch_rejects_path_escape(model_source_patch, tmp_path):
-    source, manifest, prepare, _ = model_source_patch
+    source, patch, prepare, _ = model_source_patch
     outside = tmp_path / "outside.py"
-    outside.write_text("untouched\n")
-    data = json.loads(manifest.read_text())
-    data["files"]["../outside.py"] = data["files"].pop("model.py")
-    manifest.write_text(json.dumps(data))
-    with pytest.raises(ValueError, match="escapes checkout"):
-        prepare(source, manifest)
-    assert outside.read_text() == "untouched\n"
+    outside.write_text("value = 1\n")
+    patch.write_text(patch.read_text().replace("model.py", "../outside.py"))
+    with pytest.raises(subprocess.CalledProcessError):
+        prepare()
+    assert outside.read_text() == "value = 1\n"
+    assert (source / "model.py").read_text() == "value = 1\n"
+
+
+def test_model_source_patch_preserves_unrelated_edits(model_source_patch):
+    source, _, prepare, git = model_source_patch
+    (source / "notes.txt").write_text("keep this file\n")
+    prepare()
+    prepare()
+    assert (source / "notes.txt").read_text() == "keep this file\n"
+    assert "?? notes.txt" in git("status", "--porcelain")
+
+
+def test_model_source_patch_rejects_partial_application(model_source_patch):
+    source, patch, prepare, _ = model_source_patch
+    (source / "other.py").write_text("value = 99\n")
+    patch.write_text(
+        patch.read_text() + "diff --git a/other.py b/other.py\n"
+        "--- a/other.py\n+++ b/other.py\n@@ -1 +1 @@\n"
+        "-value = 1\n+value = 2\n"
+    )
+    with pytest.raises(subprocess.CalledProcessError):
+        prepare()
+    assert (source / "model.py").read_text() == "value = 1\n"
+    assert (source / "other.py").read_text() == "value = 99\n"
 
 
 def test_compute_evaluate_metrics_reports_interact_delay_wait_time_stats():
