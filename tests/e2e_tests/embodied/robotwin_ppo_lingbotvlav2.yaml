@@ -33,3 +33,10 @@ algorithm:
 
 actor:
   global_batch_size: 4
+  model:
+    model_path: /workspace/dataset/lingbot-vla-v2-6b-robotwin/checkpoints/global_step_50000/hf_ckpt
+    tokenizer_path: /workspace/dataset/Qwen3-VL-4B-Instruct
+    lingbotvlav2:
+      training_config_path: /workspace/dataset/lingbot-vla-v2-6b-robotwin/lingbotvla_cli.yaml
+      robot_config_path: ${oc.env:REPO_PATH}/.venv/lingbot-vla-v2/configs/robot_configs/robotwin.yaml
+      stats_path: ${oc.env:REPO_PATH}/.venv/lingbot-vla-v2/assets/norm_stats/robotwin.json

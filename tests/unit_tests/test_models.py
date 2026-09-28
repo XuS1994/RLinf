@@ -1362,14 +1362,7 @@ def test_lingbotvlav2_smoke_config_composes(monkeypatch):
 
     root = Path(__file__).resolve().parents[2]
     monkeypatch.setenv("REPO_PATH", str(root))
-    for name in (
-        "LINGBOT_VLA_V2_PATH",
-        "LINGBOT_VLA_V2_CKPT",
-        "LINGBOT_VLA_V2_TRAIN_CONFIG",
-        "QWEN3_VL_PATH",
-        "ROBOTWIN_ASSETS_PATH",
-    ):
-        monkeypatch.setenv(name, "/explicit/asset")
+    monkeypatch.setenv("ROBOTWIN_ASSETS_PATH", "/explicit/asset")
     with initialize_config_dir(
         config_dir=str(root / "tests/e2e_tests/embodied"), version_base="1.1"
     ):

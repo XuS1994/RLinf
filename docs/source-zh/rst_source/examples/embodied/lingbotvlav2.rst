@@ -27,7 +27,6 @@ LingbotVLA 2.0 的 PPO 训练
    bash requirements/install.sh embodied --model lingbotvlav2 --env robotwin \
      --venv .venv-lingbotvlav2 --torch 2.9.0 --transformers 4.57.6
    source .venv-lingbotvlav2/bin/activate
-   export LINGBOT_VLA_V2_PATH="$VIRTUAL_ENV/lingbot-vla-v2"
 
 也可以构建包含相同依赖的 Docker 镜像：
 
@@ -62,9 +61,16 @@ RoboTwin 仓库与资产
    hf download Qwen/Qwen3-VL-4B-Instruct \
      --local-dir "$MODEL_ROOT/Qwen3-VL-4B-Instruct"
 
-   export LINGBOT_VLA_V2_CKPT="$MODEL_ROOT/lingbot-vla-v2-6b-robotwin/checkpoints/global_step_50000/hf_ckpt"
-   export LINGBOT_VLA_V2_TRAIN_CONFIG="$MODEL_ROOT/lingbot-vla-v2-6b-robotwin/lingbotvla_cli.yaml"
-   export QWEN3_VL_PATH="$MODEL_ROOT/Qwen3-VL-4B-Instruct"
+下载完成后，在 ``examples/embodiment/config/model/lingbotvlav2.yaml`` 中手动填写以下空白字段，替换为本机的绝对路径。训练和独立评估共用此文件：
+
+.. code-block:: yaml
+
+   model_path: /path/to/models/lingbot-vla-v2-6b-robotwin/checkpoints/global_step_50000/hf_ckpt
+   tokenizer_path: /path/to/models/Qwen3-VL-4B-Instruct
+   lingbotvlav2:
+     training_config_path: /path/to/models/lingbot-vla-v2-6b-robotwin/lingbotvla_cli.yaml
+     robot_config_path: /path/to/RLinf/.venv-lingbotvlav2/lingbot-vla-v2/configs/robot_configs/robotwin.yaml
+     stats_path: /path/to/RLinf/.venv-lingbotvlav2/lingbot-vla-v2/assets/norm_stats/robotwin.json
 
 运行
 ----
@@ -76,7 +82,7 @@ RoboTwin 仓库与资产
    cd "$RLINF_PATH"
    bash examples/embodiment/run_embodiment.sh robotwin_click_bell_ppo_lingbotvlav2 ALOHA
 
-续训时追加 ``runner.resume_dir=/path/to/checkpoints/global_step_N``。在 TensorBoard 中观察 ``env/success_once``。
+续训时，在 ``examples/embodiment/config/robotwin_click_bell_ppo_lingbotvlav2.yaml`` 中将 ``runner.resume_dir`` 设为已保存的 checkpoint 目录。在 TensorBoard 中观察 ``env/success_once``。
 
 评估
 ----
