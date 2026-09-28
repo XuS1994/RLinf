@@ -1544,7 +1544,7 @@ def test_cosmos3_sglang_response_keeps_every_env_in_input_order():
 
 @pytest.mark.parametrize("step", [0, 4, 9])
 def test_lingbotvlav2_sde_has_finite_first_and_last_step_density(step):
-    from rlinf.models.embodiment.lingbotvlav2.lingbotvlav2_action_model import (
+    from rlinf.models.embodiment.lingbotvlav2.utils import (
         flow_sde_transition,
         gaussian_logprob,
     )
@@ -1568,7 +1568,7 @@ def test_lingbotvlav2_sde_has_finite_first_and_last_step_density(step):
 
 
 def test_lingbotvlav2_zero_noise_recovers_flow_ode():
-    from rlinf.models.embodiment.lingbotvlav2.lingbotvlav2_action_model import (
+    from rlinf.models.embodiment.lingbotvlav2.utils import (
         flow_sde_transition,
     )
 

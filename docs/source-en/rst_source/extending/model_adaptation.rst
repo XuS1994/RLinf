@@ -105,11 +105,12 @@ Installation and Validation
 
 Use ``requirements/install.sh`` and its shared dependency helpers. Pin new model
 dependencies to a package version or source revision. If required hooks are
-unpublished, version the compatibility patch and hashes, retain source/license
-notices, and reject conflicting user edits. V2 uses
-``requirements/embodied/models/lingbotvlav2/source.json`` and ``ppo-compat.patch``;
-Docker and CI use the same installer. Existing models' less strict source pins
-need separate compatibility checks before changing them.
+unpublished, retain a versioned compatibility patch and source/license notices.
+V2 pins its source revision in ``requirements/install.sh`` and applies
+``requirements/embodied/models/lingbotvlav2/ppo-compat.patch`` with Git.
+Conflicting edits are rejected before applying the patch. Docker and CI use the
+same installer. Existing models' less strict source pins need separate
+compatibility checks before changing them.
 
 Verify checkpoint loading, preprocessing, rollout/actor likelihood agreement,
 finite gradients, intended trainable parameters, optimizer updates, weight sync

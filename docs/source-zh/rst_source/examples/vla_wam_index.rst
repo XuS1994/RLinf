@@ -130,9 +130,9 @@
             style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" /></a>
        <p style="margin-top: 8px; font-size: 14px; line-height: 1.4;">
          <a href="embodied/lingbotvla.html" style="text-decoration: underline; color: blue;">
-           <b>基于 Lingbot-VLA 模型的强化学习</b>
+           <b>基于 LingbotVLA 1.0 模型的强化学习</b>
          </a><br>
-         支持 Lingbot-VLA + RoboTwin + GRPO 训练
+         支持 LingbotVLA 1.0 + RoboTwin + GRPO 训练
        </p>
      </div>
 
@@ -172,7 +172,7 @@
    Dexbotic <embodied/dexbotic>
    StarVLA <embodied/starvla>
    MolmoAct2 <embodied/molmoact2>
-   Lingbot-VLA <embodied/lingbotvla>
-   LingBot-VLA 2.0 <embodied/lingbotvlav2>
+   LingbotVLA 1.0 <embodied/lingbotvla>
+   LingbotVLA 2.0 <embodied/lingbotvlav2>
    Evo-1 <embodied/evo1>
    ABot-M0 <embodied/abot_m0>

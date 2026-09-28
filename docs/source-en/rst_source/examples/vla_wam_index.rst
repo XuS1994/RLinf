@@ -134,9 +134,9 @@ Open a model page for the full workflow and its supported environments.
             style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" /></a>
        <p style="margin-top: 8px; font-size: 14px; line-height: 1.4;">
          <a href="embodied/lingbotvla.html" style="text-decoration: underline; color: blue;">
-           <b>RL with Lingbot-VLA Model</b>
+           <b>RL with LingbotVLA 1.0 Model</b>
          </a><br>
-         Support Lingbot-VLA + RoboTwin + GRPO training
+         Support LingbotVLA 1.0 + RoboTwin + GRPO training
        </p>
      </div>
 
@@ -176,7 +176,7 @@ Open a model page for the full workflow and its supported environments.
    Dexbotic <embodied/dexbotic>
    StarVLA <embodied/starvla>
    MolmoAct2 <embodied/molmoact2>
-   Lingbot-VLA <embodied/lingbotvla>
-   LingBot-VLA 2.0 <embodied/lingbotvlav2>
+   LingbotVLA 1.0 <embodied/lingbotvla>
+   LingbotVLA 2.0 <embodied/lingbotvlav2>
    Evo-1 <embodied/evo1>
    ABot-M0 <embodied/abot_m0>
