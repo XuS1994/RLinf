@@ -7,11 +7,7 @@ LingbotVLA 2.0 模型强化学习
 
    LingbotVLA 2.0 框架（图片来源：`Robbyant <https://github.com/robbyant/lingbot-vla-v2>`__）。
 
-`LingbotVLA 2.0 <https://huggingface.co/robbyant/lingbot-vla-v2-6b-robotwin>`__ 是一个基于
-Qwen3-VL 底座的视觉-语言-动作模型。它的混合专家（MoE）动作专家通过 flow matching 在 55 维的
-latent 动作空间中生成 50 步动作块，再由机器人配置映射为 RoboTwin 的 14 维关节指令。RLinf
-**原生**\ 加载官方发布的 RoboTwin checkpoint，用 PPO 训练动作专家，Qwen3-VL 底座和动作专家的
-MoE 路由器保持冻结。
+用 PPO 在 RoboTwin 2.0 上微调 `LingbotVLA 2.0 <https://huggingface.co/robbyant/lingbot-vla-v2-6b-robotwin>`__ 的动作专家。RLinf **原生**\ 加载官方发布的 RoboTwin checkpoint，并以它作为训练起点。LingbotVLA 2.0 是基于 Qwen3-VL 底座的视觉-语言-动作模型：它的混合专家（MoE）动作专家通过 flow matching 在 55 维的 latent 动作空间中生成 50 步动作块，再由机器人配置映射为 RoboTwin 的 14 维关节指令。PPO 只更新动作专家，Qwen3-VL 底座和动作专家的 MoE 路由器保持冻结。
 
 概览
 ----------------------------------------
@@ -124,9 +120,7 @@ LingbotVLA 2.0 的源码位于 ``/opt/venv/lingbotvlav2/lingbot-vla-v2``。
     bash requirements/install.sh embodied --model lingbotvlav2 --env robotwin
     source .venv/bin/activate
 
-安装脚本会把 `RLinf 维护的 LingbotVLA 2.0 fork <https://github.com/RLinf/lingbot-vla-v2/tree/rlinf>`__
-的 ``rlinf`` 分支克隆到 ``.venv/lingbot-vla-v2``，该分支补充了 RLinf PPO 所需的接口。
-如需放在其他位置，请在安装前设置 ``LINGBOT_VLA_V2_PATH``。
+安装脚本会把 `RLinf 维护的 LingbotVLA 2.0 fork <https://github.com/RLinf/lingbot-vla-v2/tree/rlinf>`__ 的 ``rlinf`` 分支克隆到 ``.venv/lingbot-vla-v2``，该分支补充了 RLinf PPO 所需的接口。如需放在其他位置，请在安装前设置 ``LINGBOT_VLA_V2_PATH``。
 
 RoboTwin 仓库克隆与资产下载
 ----------------------------------------
@@ -152,8 +146,7 @@ RoboTwin Assets 是 RoboTwin 环境运行所需的资源文件，需要从 Huggi
     hf download robbyant/lingbot-vla-v2-6b-robotwin --local-dir lingbot-vla-v2-6b-robotwin
     hf download Qwen/Qwen3-VL-4B-Instruct --local-dir Qwen3-VL-4B-Instruct
 
-然后在 ``examples/embodiment/config/model/lingbotvlav2.yaml`` 中填写空白的路径字段。训练与独立评测都读取这个文件，
-任何路径留空时，模型都会在启动时报错并指出对应字段：
+然后在 ``examples/embodiment/config/model/lingbotvlav2.yaml`` 中填写空白的路径字段。训练与独立评测都读取这个文件，任何路径留空时，模型都会在启动时报错并指出对应字段：
 
 .. code-block:: yaml
 
@@ -172,20 +165,15 @@ RoboTwin Assets 是 RoboTwin 环境运行所需的资源文件，需要从 Huggi
 配置文件
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* **PPO（强化学习）**：
-  ``examples/embodiment/config/robotwin_click_bell_ppo_lingbotvlav2.yaml``
-* **模型默认配置**，与独立评测共用：
-  ``examples/embodiment/config/model/lingbotvlav2.yaml``
+* **PPO（强化学习）**：``examples/embodiment/config/robotwin_click_bell_ppo_lingbotvlav2.yaml``
+* **模型默认配置**，与独立评测共用：``examples/embodiment/config/model/lingbotvlav2.yaml``
 
 关键配置片段 (PPO)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-训练 rollout 在每个动作 chunk 中随机选一个去噪步按 flow-SDE 采样，其余步沿 ODE 推进。PPO 只为这一步计算概率，
-且只计入机器人变换解码为 RoboTwin 控制量的 14 个潜在坐标；每个坐标一个比率（``token_level``），并启用 dual-clip
-（``clip_ratio_c``）。奖励与价值为 chunk 级，``critic_warmup_steps`` 在策略更新前先单独训练新的价值头若干个优化器步。
+训练 rollout 在每个动作 chunk 中随机选一个去噪步按 flow-SDE 采样，其余步沿 ODE 推进。PPO 只为这一步计算概率，且只计入机器人变换解码为 RoboTwin 控制量的 14 个 latent 坐标；每个坐标一个比率（``token_level``），并启用 dual-clip（``clip_ratio_c``）。奖励与价值为 chunk 级，``critic_warmup_steps`` 在 policy 更新前先单独训练新的价值头若干个优化器步。
 
-actor 以 fp32 保存可训练的动作专家权重，因为在当前学习率下，bf16 存储会把优化器的更新舍入掉。FSDP2 仍以 bf16 计算，
-rollout 保留一份 bf16 权重。
+actor 以 fp32 保存可训练的动作专家权重，因为在当前学习率下，bf16 存储会把优化器的更新舍入掉。FSDP2 仍以 bf16 计算，rollout 保留一份 bf16 权重。
 
 .. code-block:: yaml
 
@@ -212,9 +200,7 @@ rollout 保留一份 bf16 权重。
           reduce_dtype: fp32
           cast_forward_inputs: false
 
-每次更新前，actor 会重新为 rollout 采样的每个 SDE 步计算概率。若某个样本在 rollout 与 actor 之间的总 log-probability
-差值超过 ``algorithm.max_recompute_logprob_gap``，训练会停止；``actor/rollout_train_joint_logprob_gap_max``
-记录最大差值。
+每次更新前，actor 会重新为 rollout 采样的每个 SDE 步计算概率。若某个样本在 rollout 与 actor 之间的总 log-probability 差值超过 ``algorithm.max_recompute_logprob_gap``，训练会停止；``actor/rollout_train_joint_logprob_gap_max`` 记录最大差值。
 
 启动命令
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -238,8 +224,7 @@ rollout 保留一份 bf16 权重。
 独立评测
 ----------------------------------------
 
-通过 :doc:`RoboTwin 评测指南 <../../evaluations/guides/robotwin>` 运行独立评测，配置为
-``robotwin_click_bell_lingbotvlav2_eval``。如需评测 PPO checkpoint 而不是官方权重，传入其完整权重文件：
+通过 :doc:`RoboTwin 评测指南 <../../evaluations/guides/robotwin>` 运行独立评测，配置为 ``robotwin_click_bell_lingbotvlav2_eval``。在新的终端中评测前，先导出 `启动命令`_ 中的三个环境变量。如需评测 PPO checkpoint 而不是官方权重，传入其完整权重文件：
 
 .. code-block:: bash
 
@@ -253,7 +238,6 @@ rollout 保留一份 bf16 权重。
 
 .. code:: bash
 
-   tensorboard --logdir ../results --port 6006
+   tensorboard --logdir ./logs --port 6006
 
-关键指标是 ``env/success_once``。完整指标说明见
-:doc:`训练指标 <../../reference/metrics>`。
+关键指标是 ``env/success_once``。完整指标说明见 :doc:`训练指标 <../../reference/metrics>`。
