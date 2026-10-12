@@ -40,34 +40,52 @@ from lingbotvla.models.vla.lingbot_vla.qwen2_action_expert import (
 from lingbotvla.models.vla.lingbot_vla.qwen3vl_in_vla import (
     apply_lingbot_qwen3_vl_patch,
 )
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from safetensors.torch import load_model
 from transformers.modeling_utils import load_sharded_checkpoint
 
 from rlinf.models.embodiment.base_policy import BasePolicy, ForwardType
 from rlinf.models.embodiment.lingbotvlav2.utils import (
-    flow_sde_transition,
-    gaussian_logprob,
+    is_rl_trainable,
+    sample_with_one_sde_step,
+    score_sde_step,
 )
 from rlinf.models.embodiment.modules.value_head import ValueHead
+from rlinf.scheduler import Worker
 from rlinf.utils.logging import get_logger
+
+# Rollout and actor both compute in bf16. ``torch_dtype`` only sets how the
+# trainable weights are stored: fp32 in the FSDP actor, so small optimizer steps
+# are not rounded away, and bf16 in the rollout. FSDP2 casts the actor's fp32
+# weights to bf16 for compute, which matches the rollout's bf16 copy.
+_COMPUTE_DTYPE = torch.bfloat16
+_REQUIRED_PATHS = (
+    "model_path",
+    "tokenizer_path",
+    "lingbotvlav2.training_config_path",
+    "lingbotvlav2.robot_config_path",
+    "lingbotvlav2.stats_path",
+)
 
 
 class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
     """Adapt the installed V2 policy and FeatureTransform to RLinf PPO.
 
-    Training uses a stochastic transition at every denoising step. PPO sums
-    their log densities over all model dimensions; the deterministic robot
-    transform then selects the 14 RoboTwin controls. Evaluation uses the ODE.
+    A training rollout takes the flow-SDE transition at one random denoising
+    step per sample and the ODE elsewhere; evaluation uses the ODE throughout.
+    PPO scores that step on the latent coordinates the robot transform decodes
+    into the 14 RoboTwin controls.
     """
 
     _no_split_modules = ["Qwen2DecoderLayer", "Qwen3VLTextDecoderLayer"]
+    # action_out_proj stays in the root FSDP unit: upstream casts its input to
+    # action_out_proj.weight.dtype from outside that layer, which must read the
+    # bf16 compute weight rather than the fp32 shard of a separate unit.
     _no_split_names = [
         "visual",
         "embed_tokens",
         "state_proj",
         "action_in_proj",
-        "action_out_proj",
         "action_time_mlp_in",
         "action_time_mlp_out",
         "time_mlp_in",
@@ -78,8 +96,15 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
 
     def __init__(self, config: DictConfig, torch_dtype: torch.dtype):
         super().__init__()
+        if torch_dtype not in (torch.bfloat16, torch.float32):
+            raise ValueError(
+                "Expected model.precision bf16 (rollout) or fp32 (actor), "
+                f"got {torch_dtype}."
+            )
+        for key in _REQUIRED_PATHS:
+            if not OmegaConf.select(config, key):
+                raise ValueError(f"Expected an absolute path in model.{key}, got none.")
         self.config = config
-        self.torch_dtype = torch_dtype
         self.num_steps = int(config.num_steps)
         self.forward_micro_batch_size = int(config.forward_micro_batch_size)
         if self.forward_micro_batch_size < 1:
@@ -87,14 +112,8 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
         self.noise_level = float(config.noise_level)
         if self.num_steps < 2 or not self.noise_level > 0:
             raise ValueError("V2 flow-SDE requires num_steps >= 2 and noise_level > 0")
-        if config.rl_trainable_scope != "action_expert":
-            raise ValueError("V2 currently supports rl_trainable_scope=action_expert")
-        if config.noise_method != "flow_sde" or not config.joint_logprob:
-            raise ValueError("V2 PPO requires flow_sde and joint_logprob=true")
         if config.is_lora:
             raise ValueError("V2 LoRA is not supported")
-        if config.lingbotvlav2.data_parallel_backend != "fsdp2":
-            raise ValueError("V2 currently requires the FSDP2 training backend")
         # Rollout and standalone evaluation workers have no process group.
         # Actors initialize theirs before constructing the model.
         if torch.distributed.is_initialized():
@@ -104,8 +123,8 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
             init_parallel_state(
                 dp_size=world_size,
                 dp_shard_size=world_size,
-                dp_mode=config.lingbotvlav2.data_parallel_backend,
-                device_type="cuda",
+                dp_mode="fsdp2",
+                device_type=Worker.torch_device_type,
             )
             state = get_parallel_state()
             if (
@@ -137,8 +156,6 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
         self.latent_dim = int(model_config.max_action_dim)
         if config.num_action_chunks != self.horizon:
             raise ValueError("num_action_chunks must match the V2 checkpoint horizon")
-        if config.logprob_dim != self.latent_dim:
-            raise ValueError("logprob_dim must cover every V2 latent action dimension")
         if config.action_dim != 14 or model_config.max_state_dim != 55:
             raise ValueError(
                 "This V2 adapter requires RoboTwin 14D controls and 55D state"
@@ -155,24 +172,17 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
             load_model(self.vla_model, str(weights / "model.safetensors"), strict=True)
         else:
             raise FileNotFoundError(f"No safetensors checkpoint in {weights}")
-        self.vla_model.to(dtype=torch_dtype)
+        self.vla_model.to(dtype=_COMPUTE_DTYPE)
         # No-grad inference kernels can have different numerical reductions.
         # The source package exposes a common differentiable MoE backend.
         self.vla_model.set_moe_forward_backend("differentiable")
-        self.vla_model.requires_grad_(False)
         for name, param in self.vla_model.named_parameters():
-            if any(
-                part in name
-                for part in (
-                    ".qwen_expert.",
-                    ".state_proj.",
-                    ".action_in_proj.",
-                    ".action_out_proj.",
-                    ".action_time_mlp_",
-                    ".time_mlp_",
-                )
-            ):
-                param.requires_grad_(True)
+            trainable = is_rl_trainable(name)
+            param.requires_grad_(trainable)
+            if trainable:
+                # Cast parameters only: buffers such as MoE routing biases must
+                # stay bf16 so actor and rollout route tokens identically.
+                param.data = param.data.to(torch_dtype)
         self.value_head = None
         if config.add_value_head:
             self.value_head = ValueHead(
@@ -270,7 +280,7 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
         return {
             key: value.to(
                 device=device,
-                dtype=self.torch_dtype if key in {"images", "state"} else value.dtype,
+                dtype=_COMPUTE_DTYPE if key in {"images", "state"} else value.dtype,
             )
             for key, value in inputs.items()
         }
@@ -317,7 +327,7 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
             inputs["state"],
             padding,
             cache,
-            x.to(self.torch_dtype),
+            x.to(_COMPUTE_DTYPE),
             time.expand(len(x)),
             prefix_position_ids=positions,
         ).float()
@@ -325,7 +335,7 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
     def _values(self, features: torch.Tensor) -> torch.Tensor:
         if self.value_head is None:
             return features.new_zeros((len(features), 1), dtype=torch.float32)
-        return self.value_head(features.to(self.torch_dtype)).float()
+        return self.value_head(features.to(_COMPUTE_DTYPE)).float()
 
     def _times(self, device: torch.device) -> torch.Tensor:
         return torch.linspace(
@@ -334,7 +344,7 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
 
     @torch.no_grad()
     def predict_action_batch(self, env_obs: dict, mode: str = "train", **kwargs: Any):
-        """Return physical actions plus the detached normalized trajectory for PPO."""
+        """Return physical actions plus the stochastic step PPO replays."""
         if mode not in {"train", "eval"}:
             raise ValueError(f"Unknown V2 rollout mode {mode!r}")
         prepared = self.prepare_observations(env_obs)
@@ -362,23 +372,19 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
     def _sample_actions(self, prepared: dict, mode: str):
         inputs = self._device_inputs(prepared)
         context = self._prefix(inputs)
+        device = inputs["state"].device
         shape = (len(inputs["state"]), self.horizon, self.latent_dim)
-        x = torch.randn(shape, device=inputs["state"].device, dtype=torch.float32)
-        chain = [x]
-        logprobs = torch.zeros_like(x)
-        times = self._times(x.device)
-        for step in range(self.num_steps):
-            time, delta = times[step], times[step] - times[step + 1]
-            velocity = self._velocity(x, time, inputs, context)
-            if mode == "train":
-                mean, std = flow_sde_transition(
-                    x, velocity, time, delta, self.noise_level
-                )
-                x = mean + std * torch.randn_like(mean)
-                logprobs += gaussian_logprob(x, mean, std)
-            else:
-                x = x - delta * velocity
-            chain.append(x)
+        noise = torch.randn(shape, device=device, dtype=torch.float32)
+        sde_steps = None
+        if mode == "train":
+            sde_steps = torch.randint(self.num_steps, (shape[0],), device=device)
+        x, sde_states, logprobs = sample_with_one_sde_step(
+            noise,
+            lambda latent, time: self._velocity(latent, time, inputs, context),
+            self._times(device),
+            self.noise_level,
+            sde_steps,
+        )
         physical = []
         for index in range(len(x)):
             item = {key: value[index].cpu() for key, value in prepared.items()}
@@ -389,16 +395,25 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
             raise ValueError(f"Unexpected V2 robot action shape {actions.shape}")
         if not torch.isfinite(actions).all():
             raise ValueError("V2 generated non-finite robot actions")
-        forward_inputs = {
-            **prepared,
-            "chains": torch.stack(chain, dim=1),
-            "actions": actions,
-        }
+        forward_inputs = dict(prepared)
+        if sde_steps is not None:
+            forward_inputs.update(sde_states=sde_states, sde_steps=sde_steps)
         return actions, {
-            "prev_logprobs": logprobs.flatten(1),
+            "prev_logprobs": self._decoded_coordinates(logprobs, inputs).flatten(1),
             "prev_values": self._values(context[-1]),
             "forward_inputs": forward_inputs,
         }
+
+    def _decoded_coordinates(self, latent: torch.Tensor, inputs: dict) -> torch.Tensor:
+        """Keep the latent coordinates the robot transform decodes into controls."""
+        masks = inputs["action_joint_mask"]
+        mask = masks[0]
+        if not (masks == mask).all() or int(mask.sum()) != self.config.action_dim:
+            raise ValueError(
+                f"Expected one action_joint_mask with {self.config.action_dim} "
+                f"decoded coordinates, got sums {masks.sum(-1).tolist()}."
+            )
+        return latent[..., mask]
 
     def forward(self, forward_type=ForwardType.DEFAULT, **kwargs: Any):
         if forward_type != ForwardType.DEFAULT:
@@ -411,7 +426,7 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
         self, forward_inputs: dict, compute_values: bool = True, **kwargs: Any
     ):
         """Re-score recorded transitions; never draw noise during actor training."""
-        if forward_inputs["chains"].dtype != torch.float32:
+        if forward_inputs["sde_states"].dtype != torch.float32:
             raise ValueError(
                 "V2 SDE samples must stay FP32; set FSDP cast_forward_inputs=false"
             )
@@ -428,31 +443,24 @@ class LingbotVLAV2ActionModel(nn.Module, BasePolicy):
 
     def _score_actions(self, forward_inputs: dict, compute_values: bool):
         inputs = self._device_inputs(forward_inputs)
-        chain = inputs["chains"].detach().float()
-        expected = (
-            len(inputs["state"]),
-            self.num_steps + 1,
-            self.horizon,
-            self.latent_dim,
-        )
-        if tuple(chain.shape) != expected:
+        states = inputs["sde_states"].detach()
+        expected = (len(inputs["state"]), 2, self.horizon, self.latent_dim)
+        if tuple(states.shape) != expected:
             raise ValueError(
-                f"Expected latent trajectory {expected}, got {tuple(chain.shape)}"
+                f"Expected SDE states {expected}, got {tuple(states.shape)}"
             )
         context = self._prefix(inputs)
-        times = self._times(chain.device)
-        logprobs = torch.zeros_like(chain[:, 0])
-        entropy = torch.zeros_like(logprobs)
-        for step in range(self.num_steps):
-            time, delta = times[step], times[step] - times[step + 1]
-            velocity = self._velocity(chain[:, step], time, inputs, context)
-            mean, std = flow_sde_transition(
-                chain[:, step], velocity, time, delta, self.noise_level
-            )
-            logprobs = logprobs + gaussian_logprob(chain[:, step + 1], mean, std)
-            entropy = entropy + torch.distributions.Normal(mean, std).entropy()
+        logprobs = score_sde_step(
+            states,
+            lambda latent, time: self._velocity(latent, time, inputs, context),
+            self._times(states.device),
+            inputs["sde_steps"],
+            self.noise_level,
+        )
         return {
-            "logprobs": logprobs.flatten(1),
+            "logprobs": self._decoded_coordinates(logprobs, inputs).flatten(1),
             "values": self._values(context[-1]) if compute_values else None,
-            "entropy": entropy.flatten(1),
+            # The transition std depends only on the noise schedule, so entropy
+            # is a constant; None makes an entropy bonus fail instead of no-op.
+            "entropy": None,
         }

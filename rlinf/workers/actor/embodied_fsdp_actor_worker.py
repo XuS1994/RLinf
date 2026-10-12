@@ -417,7 +417,13 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
             batch_size_per_rank: Samples per optimizer step on this rank.
 
         Returns:
-            Dict with ``actor/rollout_train_logprob_gap`` (mean absolute logprob difference).
+            Dict with ``actor/rollout_train_logprob_gap`` (mean absolute logprob
+            difference) and ``actor/rollout_train_joint_logprob_gap_max`` (largest
+            absolute difference of a sample's summed log-probability).
+
+        Raises:
+            ValueError: If ``algorithm.max_recompute_logprob_gap`` is set and the
+                joint gap exceeds it or is not finite.
         """
         assert "forward_inputs" in self.rollout_batch, (
             "Recomputing logprobs requires rollout forward_inputs."
@@ -466,9 +472,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
         clear_memory()
 
         # Logprobs are per action token, the mask and the advantages per action.
-        action_dim = self.cfg.actor.model.get(
-            "logprob_dim", self.cfg.actor.model.get("action_dim", 7)
-        )
+        action_dim = self.cfg.actor.model.get("action_dim", 7)
         log_ratio = (recomputed_logprobs - rollout_logprobs).reshape(
             *rollout_logprobs.shape[:-1], -1, action_dim
         )
@@ -478,26 +482,24 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
             if loss_mask is None
             else loss_mask.bool().unsqueeze(-1).expand_as(log_ratio)
         )
+        joint_log_ratio = (
+            log_ratio if mask is None else log_ratio.masked_fill(~mask, 0)
+        ).sum(dim=(-2, -1))
+        joint_gap = joint_log_ratio.abs().max().item()
         metrics = {
             "actor/rollout_train_logprob_gap": masked_mean(
                 log_ratio.abs(), mask=mask
-            ).item()
+            ).item(),
+            "actor/rollout_train_joint_logprob_gap_max": joint_gap,
         }
-        if (
-            SupportedModel(self.cfg.actor.model.model_type)
-            == SupportedModel.LINGBOTVLAV2
-        ):
-            joint_gap = log_ratio.sum(dim=(-2, -1)).abs().max().item()
-            metrics["actor/rollout_train_joint_logprob_gap_max"] = joint_gap
-            if (
-                not np.isfinite(joint_gap)
-                or joint_gap > self.cfg.actor.model.logprob_replay_atol
-            ):
-                raise ValueError(
-                    f"V2 rollout/actor joint logprob gap {joint_gap} exceeds "
-                    f"{self.cfg.actor.model.logprob_replay_atol}; likelihood replay must "
-                    "match before a PPO update"
-                )
+        max_gap = self.cfg.algorithm.get("max_recompute_logprob_gap", None)
+        # Written so that a NaN gap also fails.
+        if max_gap is not None and not joint_gap <= max_gap:
+            raise ValueError(
+                "Expected the rollout/actor log-probability of every sample to "
+                f"differ by at most algorithm.max_recompute_logprob_gap={max_gap}, "
+                f"found {joint_gap}."
+            )
 
         self.rollout_batch["prev_logprobs"] = recomputed_logprobs
         return metrics
@@ -775,9 +777,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
             "loss_type": self.cfg.algorithm.loss_type,
             "logprob_type": self.cfg.algorithm.logprob_type,
             "reward_type": self.cfg.algorithm.reward_type,
-            "single_action_dim": self.cfg.actor.model.get(
-                "logprob_dim", self.cfg.actor.model.get("action_dim", 7)
-            ),
+            "single_action_dim": self.cfg.actor.model.get("action_dim", 7),
             "logprobs": output_dict["logprobs"],
             "values": output_dict.get("values", None),
             "old_logprobs": prev_logprobs,
@@ -804,6 +804,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
             SupportedModel.GR00T_N1D6,
             SupportedModel.GR00T_N1D7,
             SupportedModel.PI0_FAST,
+            SupportedModel.LINGBOTVLAV2,
         ]:
             loss_kwargs["clip_ratio_c"] = self.cfg.algorithm.get("clip_ratio_c", 3.0)
             if self.cfg.algorithm.get("clip_log_ratio_min") is not None:
@@ -839,9 +840,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
                     entropy,
                     entropy_type=self.cfg.algorithm.entropy_type,
                     loss_mask=entropy_mask,
-                    action_dim=self.cfg.actor.model.get(
-                        "logprob_dim", self.cfg.actor.model.get("action_dim", 7)
-                    ),
+                    action_dim=self.cfg.actor.model.get("action_dim", 7),
                     batch_size=output_dict["logprobs"].shape[0],
                 )
                 if self.cfg.algorithm.entropy_bonus > 0:

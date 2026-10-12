@@ -35,10 +35,10 @@ RLinf 是一个灵活且可扩展的开源框架，专为具身智能和智能�
 - [2026/10] 🎉 RLinf v0.4 发布，让强化学习真正走出仿真、敏捷操控物理世界。主要升级：乐高式真机工程体系（`rlinf.robotics`）、真机 SOTA 后训练算法（RLT、STEAM、OPD、RTC）、全模态模型（PyTorch 原生 OpenPI π₀ / π₀.₅、Cosmos3、FastWAM、π₀-FAST、Evo-1、MolmoAct2、SD3 / Wan2.2）以及八大异构算力支持。发布说明：[RLinf v0.4](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/resources/release_v0.4.html)。
 - [2026/10] 🎉 RLinf 发布 **CEL**（Collective Experience Learning）：机器人集群从部署期自身经验中共同改进共享策略，无需额外专家示教或纠错动作；在最多 96 台真机、5 项真实任务上验证。项目主页：[CEL](https://cel-robot-learning.github.io/)，论文：[arXiv:2610.25736](https://arxiv.org/abs/2610.25736)。代码即将开源。
 - [2026/10] 🔥 RLinf 支持沐曦（MetaX MACA）GPU。PR：[沐曦 GPU 支持（#1656）](https://github.com/RLinf/RLinf/pull/1656)。
+- [2026/10] 🔥 RLinf 支持在 RoboTwin 上用 PPO 对 LingbotVLA 2.0 进行强化学习。文档：[LingbotVLA 2.0](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/lingbotvlav2.html)。
 - [2026/09] 🔥 RLinf 重构真机机器人与环境，用统一的 robotics 接口分开管理硬件、任务和 rollout wrapper。文档：[机器人接口](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/concepts/robotics.html)、[机器人架构](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/concepts/robotics_architecture.html)、[真机任务与环境](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/concepts/realworld_envs.html)、[添加机器人](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/extending/new_robot.html)、[新增真机任务](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/extending/new_task.html)、[遥操作](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/guides/teleoperation.html)。
 - [2026/09] 🔥 RLinf 支持 π₀-FAST 强化学习。文档：[π₀-FAST](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/pi0_fast.html)。
 - [2026/09] 🔥 RLinf 支持壁仞 GPU。PR：[壁仞 GPU 支持（#1581）](https://github.com/RLinf/RLinf/pull/1581)。
-- [2026/09] 新增 LingBot-VLA 2.0 的 RoboTwin PPO 支持，对完整 latent 轨迹计算概率。[配置与验证说明](docs/source-zh/rst_source/examples/embodied/lingbotvlav2.rst)。
 - [2026/09] 🔥 RLinf 支持基于 ApxInf 加速的 π₀.₅ LIBERO 评测：resize、tokenize、归一化等仍由 RLinf 原生 OpenPI transforms 负责，仅经由 ApxInf 的 L1 推理接口接入引擎。文档：[ApxInf LIBERO 评测](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/evaluations/guides/libero.html#apxinf-backend)。
 - [2026/09] 🔥 RLinf 支持 [FastWAM](https://github.com/yuantianyuan01/FastWAM) 的 FSDP 监督微调与 LIBERO 批量评测。文档：[FastWAM 评测与监督微调](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/sft_fastwam.html)。
 - [2026/08] 🔥 RLinf 支持对英伟达全模态世界模型 Cosmos3 做 SFT 及基于 SGLang 的评测。文档：[Cosmos3 SFT](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/sft_cosmos3.html)、[SGLang 评测](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/evaluations/guides/cosmos3_sglang.html)。
@@ -182,6 +182,7 @@ RLinf 支持 World Action Model（WAM）和 Vision-Language-Action Model（VLA�
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/dexbotic.html">Dexbotic</a> ✅</li>
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/starvla.html">StarVLA</a> ✅</li>
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/lingbotvla.html">LingbotVLA 1.0</a> ✅</li>
+            <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/lingbotvlav2.html">LingbotVLA 2.0</a> ✅</li>
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/abot_m0.html">ABot-M0</a> ✅</li>
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/evo1.html">Evo-1</a> ✅</li>
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/molmoact2.html">MolmoAct2</a> ✅</li>
