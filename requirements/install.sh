@@ -2696,58 +2696,26 @@ install_lingbot_vla_model() {
     uv pip uninstall pynvml || true
 }
 
-apply_model_source_patch() {
-    local source_dir="$1" revision="$2" patch="$3"
-    if [ "$(git -C "$source_dir" rev-parse HEAD)" != "$revision" ]; then
-        echo "Expected model source revision $revision. Existing files were preserved." >&2
-        return 1
-    fi
-    if git -C "$source_dir" apply --reverse --check "$patch" 2>/dev/null; then
-        return 0
-    fi
-    if ! git -C "$source_dir" apply --check "$patch"; then
-        echo "Model source conflicts with the compatibility patch. Existing files were preserved." >&2
-        return 1
-    fi
-    git -C "$source_dir" apply "$patch"
-}
-
 install_lingbot_vla_v2_model() {
-    if [ "$ENV_NAME" != "robotwin" ]; then
-        echo "LingBot-VLA V2 currently supports --env robotwin." >&2
-        exit 1
-    fi
-    if [ "$TORCH_VERSION" != "2.9.0" ] || [ "$TRANSFORMERS_VERSION" != "4.57.6" ]; then
-        echo "V2's verified runtime requires --torch 2.9.0 --transformers 4.57.6." >&2
-        exit 1
-    fi
     create_and_sync_venv
     install_common_embodied_deps
-    local vla2_ref=ecca77bb259b9592d5fc0eb2b4972d4a236ed2c8
-    local vla2_path="${LINGBOT_VLA_V2_PATH:-$VENV_DIR/lingbot-vla-v2}"
-    local existing_source=0
-    if [ -d "$vla2_path" ]; then
-        existing_source=1
-    fi
-    vla2_path=$(clone_or_reuse_repo LINGBOT_VLA_V2_PATH "$vla2_path" "${GITHUB_PREFIX}https://github.com/robbyant/lingbot-vla-v2.git" --no-checkout)
-    if [ "$existing_source" -eq 0 ]; then
-        git -C "$vla2_path" checkout --detach "$vla2_ref"
-    fi
-    # Upstream does not yet expose the checkpoint metadata and PPO MoE hooks.
-    apply_model_source_patch "$vla2_path" "$vla2_ref" \
-        "$SCRIPT_DIR/embodied/models/lingbotvlav2/ppo-compat.patch"
+    # The RLinf fork's rlinf branch adds the checkpoint metadata and PPO MoE hooks.
+    local vla2_path
+    vla2_path=$(clone_or_reuse_repo LINGBOT_VLA_V2_PATH "$VENV_DIR/lingbot-vla-v2" "${GITHUB_PREFIX}https://github.com/RLinf/lingbot-vla-v2.git" -b rlinf)
     uv pip install -e "$vla2_path" --no-deps
-    printf 'V2 source (LINGBOT_VLA_V2_PATH): %s\n' "$vla2_path"
-    install_robotwin_env
+
+    case "$ENV_NAME" in
+        robotwin)
+            install_robotwin_env
+            ;;
+        *)
+            echo "Environment '$ENV_NAME' is not supported for LingBot-VLA V2." >&2
+            exit 1
+            ;;
+    esac
+    # Model pins go last so the env install cannot move them.
     uv pip install -r "$SCRIPT_DIR/embodied/models/lingbotvlav2.txt"
     install_flash_attn
-    python - <<'EOF'
-from lingbotvla.checkpoint_metadata import read_checkpoint_config
-from lingbotvla.models.vla.lingbot_vla.modeling_lingbot_vla_v2 import LingbotVlaV2Policy
-assert callable(read_checkpoint_config)
-assert callable(LingbotVlaV2Policy.set_moe_forward_backend)
-assert callable(LingbotVlaV2Policy.set_moe_activation_checkpointing)
-EOF
 }
 
 install_abot_m0_model() {

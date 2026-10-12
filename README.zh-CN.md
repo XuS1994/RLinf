@@ -30,7 +30,7 @@ RLinf 是一个灵活且可扩展的开源框架，专为具身智能和智能�
 
 ## 最新动态
 
-- [2026/09] 新增 LingBot-VLA 2.0 的 RoboTwin PPO 支持，对完整 latent 轨迹计算概率。[配置与验证说明](docs/source-zh/rst_source/examples/embodied/lingbotvlav2.rst)。
+- [2026/10] 🔥 RLinf 支持在 RoboTwin 上用 PPO 对 LingbotVLA 2.0 进行强化学习。文档：[LingbotVLA 2.0](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/lingbotvlav2.html)。
 - [2026/09] 🔥 RLinf 重构真机机器人与环境，用统一的 robotics 接口分开管理硬件、任务和 rollout wrapper。文档：[机器人接口](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/concepts/robotics.html)、[机器人架构](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/concepts/robotics_architecture.html)、[真机任务与环境](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/concepts/realworld_envs.html)、[添加机器人](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/extending/new_robot.html)、[新增真机任务](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/extending/new_task.html)、[遥操作](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/guides/teleoperation.html)。
 - [2026/09] 🔥 RLinf 支持 π₀-FAST 强化学习。文档：[π₀-FAST](https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/pi0_fast.html)。
 - [2026/09] 🔥 RLinf 支持壁仞 GPU。PR：[壁仞 GPU 支持（#1581）](https://github.com/RLinf/RLinf/pull/1581)。
@@ -177,6 +177,7 @@ RLinf 支持 World Action Model（WAM）和 Vision-Language-Action Model（VLA�
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/dexbotic.html">Dexbotic</a> ✅</li>
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/starvla.html">StarVLA</a> ✅</li>
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/lingbotvla.html">LingbotVLA 1.0</a> ✅</li>
+            <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/lingbotvlav2.html">LingbotVLA 2.0</a> ✅</li>
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/abot_m0.html">ABot-M0</a> ✅</li>
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/evo1.html">Evo-1</a> ✅</li>
             <li><a href="https://rlinf.readthedocs.io/zh-cn/latest/rst_source/examples/embodied/molmoact2.html">MolmoAct2</a> ✅</li>

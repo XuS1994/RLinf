@@ -1089,31 +1089,49 @@ def validate_embodied_cfg(cfg):
         f"Supported embodied models: {sorted([x.value for x in EMBODIED_MODEL])}; "
         f"supported diffusion models: {sorted([x.value for x in DIFFUSION_MODELS])}."
     )
-    if model_cfg.model_type == "lingbotvlav2" and not only_eval:
+    if model_type == SupportedModel.LINGBOTVLAV2:
+        # V2 always computes in bf16; only the FSDP actor stores fp32 weights,
+        # because the rollout has no FSDP cast to bring them back to bf16.
+        rollout_precision = cfg.rollout.model.get("precision", model_cfg.precision)
+        if torch_dtype_from_precision(rollout_precision) != torch.bfloat16:
+            raise ValueError(
+                "Expected rollout.model.precision=bf16 for LingBot-VLA V2, "
+                f"got {rollout_precision!r}."
+            )
+    if model_type == SupportedModel.LINGBOTVLAV2 and not only_eval:
+        if algorithm_cfg.reward_type != "chunk_level":
+            raise ValueError(
+                "LingBot-VLA V2 predicts one value per action chunk; expected "
+                "algorithm.reward_type=chunk_level, got "
+                f"{algorithm_cfg.reward_type!r}."
+            )
+        fsdp_cfg = cfg.actor.fsdp_config
+        if fsdp_cfg.strategy != "fsdp2":
+            raise ValueError(
+                "Expected actor.fsdp_config.strategy=fsdp2 for LingBot-VLA V2, "
+                f"got {fsdp_cfg.strategy!r}."
+            )
+        param_dtype = fsdp_cfg.mixed_precision.get("param_dtype", None)
         if (
-            algorithm_cfg.logprob_type != "chunk_level"
-            or algorithm_cfg.reward_type != "chunk_level"
+            torch_dtype_from_precision(model_cfg.precision) != torch.float32
+            or torch_dtype_from_precision(param_dtype) != torch.bfloat16
         ):
             raise ValueError(
-                "LingBot-VLA V2 PPO scores whole latent trajectories; use chunk_level logprobs and rewards"
+                "LingBot-VLA V2 PPO keeps trainable weights in fp32 and computes "
+                "in bf16; expected actor.model.precision=fp32 and "
+                "actor.fsdp_config.mixed_precision.param_dtype=bf16, got "
+                f"{model_cfg.precision!r} and {param_dtype!r}."
             )
-        if model_cfg.logprob_dim != 55 or model_cfg.action_dim != 14:
+        if fsdp_cfg.mixed_precision.get("cast_forward_inputs", True):
             raise ValueError(
-                "LingBot-VLA V2 RoboTwin requires logprob_dim=55 and action_dim=14"
-            )
-        if (
-            cfg.actor.fsdp_config.strategy != "fsdp2"
-            or model_cfg.lingbotvlav2.data_parallel_backend != "fsdp2"
-        ):
-            raise ValueError("LingBot-VLA V2 requires FSDP2 data parallelism")
-        if cfg.actor.fsdp_config.mixed_precision.cast_forward_inputs:
-            raise ValueError(
-                "LingBot-VLA V2 requires cast_forward_inputs=false to preserve FP32 SDE samples"
+                "Expected actor.fsdp_config.mixed_precision.cast_forward_inputs="
+                "false for LingBot-VLA V2, which keeps its SDE samples in fp32."
             )
 
     if not only_eval and algorithm_cfg.get("recompute_logprobs", False):
-        # Recompute supports flattened token or latent-coordinate logprobs.
-        # ``logprob_dim`` distinguishes latent width from the robot action width.
+        # The actor-side recompute reshapes logprobs by ``action_dim`` to report the
+        # gap per action, which assumes one logprob per action dimension, as the
+        # OpenVLA family and LingBot-VLA V2 provide.
         # GR00T needs no recompute: it already rescores inside its training forward.
         assert model_type in [
             SupportedModel.OPENVLA,

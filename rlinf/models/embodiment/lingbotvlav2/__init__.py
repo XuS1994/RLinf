@@ -20,4 +20,4 @@ def get_model(cfg: DictConfig, torch_dtype: torch.dtype | None = None):
     """Build V2 through its independently installed training package."""
     from .lingbotvlav2_action_model import LingbotVLAV2ActionModel
 
-    return LingbotVLAV2ActionModel(cfg, torch_dtype=torch_dtype or torch.bfloat16)
+    return LingbotVLAV2ActionModel(cfg, torch_dtype=torch_dtype)
