@@ -298,7 +298,7 @@ GRPO 顶层文件通过 Hydra 动态组装了环境与模型，并直接在 ``ac
 
 .. code:: bash
 
-   tensorboard --logdir ../results --port 6006
+   tensorboard --logdir ./logs --port 6006
 
 关键指标是 ``env/success_once``。完整指标说明见
 :doc:`训练指标 <../../reference/metrics>`。

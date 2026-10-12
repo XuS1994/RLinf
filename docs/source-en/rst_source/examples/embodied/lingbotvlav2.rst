@@ -7,13 +7,15 @@ RL on LingbotVLA 2.0 Models
 
    LingbotVLA 2.0 framework (image: `Robbyant <https://github.com/robbyant/lingbot-vla-v2>`__).
 
-`LingbotVLA 2.0 <https://huggingface.co/robbyant/lingbot-vla-v2-6b-robotwin>`__ is a
-vision-language-action model built on a Qwen3-VL backbone. A mixture-of-experts
+Fine-tune the action expert of
+`LingbotVLA 2.0 <https://huggingface.co/robbyant/lingbot-vla-v2-6b-robotwin>`__
+with PPO on RoboTwin 2.0. RLinf loads the released RoboTwin checkpoint
+**natively** and starts training from it. LingbotVLA 2.0 is a
+vision-language-action model built on a Qwen3-VL backbone. Its mixture-of-experts
 action expert generates 50-step action chunks by flow matching in a 55-dimensional
 latent action space, which the robot configuration maps to RoboTwin's 14 joint
-commands. RLinf loads the released RoboTwin checkpoint **natively** and trains
-the action expert with PPO. The Qwen3-VL backbone and the action expert's MoE
-routers stay frozen.
+commands. PPO updates only the action expert; the Qwen3-VL backbone and the
+action expert's MoE routers stay frozen.
 
 Overview
 --------
@@ -254,8 +256,9 @@ Standalone Evaluation
 ---------------------
 
 Run standalone evaluation through the :doc:`RoboTwin evaluation guide <../../evaluations/guides/robotwin>`
-with the ``robotwin_click_bell_lingbotvlav2_eval`` config. To evaluate a PPO
-checkpoint instead of the released weights, pass its full weights file:
+with the ``robotwin_click_bell_lingbotvlav2_eval`` config. In a new shell, first
+export the three variables from `Launch Commands`_. To evaluate a PPO checkpoint
+instead of the released weights, pass its full weights file:
 
 .. code-block:: bash
 
@@ -269,7 +272,7 @@ Launch TensorBoard from the RLinf repo root:
 
 .. code:: bash
 
-   tensorboard --logdir ../results --port 6006
+   tensorboard --logdir ./logs --port 6006
 
 The key signal is ``env/success_once``. For every logged metric, see
 :doc:`Training metrics <../../reference/metrics>`.
