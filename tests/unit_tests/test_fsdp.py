@@ -1193,6 +1193,13 @@ def test_fp32_trainable_weights_beside_frozen_bf16_keep_small_updates(
     backbone; with bf16 storage, AdamW steps this small round back to the old
     weights.
     """
+    from packaging.version import Version
+
+    if Version(torch.__version__) < Version("2.8.0"):
+        pytest.skip(
+            "FSDP2 mixed frozen/trainable parameter dtypes require PyTorch >= 2.8"
+        )
+
     torch.manual_seed(0)
     policy = _MixedPolicy()
     before = policy.block.head.weight.detach().clone()
