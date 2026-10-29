@@ -1709,6 +1709,7 @@ def test_lingbotvlav2_smoke_config_composes(monkeypatch):
     ):
         cfg = compose(config_name="robotwin_ppo_lingbotvlav2")
     OmegaConf.resolve(cfg)
+    assert dict(cfg.cluster.component_placement) == {"actor, env, rollout": "0-1"}
     assert cfg.actor.model.model_type == "lingbotvlav2"
     assert cfg.actor.model.action_dim == 14
     assert cfg.actor.model.num_action_chunks == 50
